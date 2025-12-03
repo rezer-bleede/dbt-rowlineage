@@ -1,9 +1,9 @@
 [project]
 name = "dbt-rowlineage"
-version = "0.2.0"
+dynamic = ["version"]
 description = "Adapter-agnostic dbt plugin providing row-level lineage tracing"
+readme = { file = "README.md", content-type = "text/markdown" }
 authors = [{ name = "OpenAI", email = "dev@example.com" }]
-readme = "README.md"
 license = { file = "LICENSE" }
 keywords = ["dbt", "lineage", "analytics", "data-engineering"]
 classifiers = [
@@ -21,7 +21,7 @@ classifiers = [
 ]
 requires-python = ">=3.10"
 dependencies = [
-    "dbt-core>=1.6,<2.0",
+    "dbt-core>=1.7",
     "pandas>=1.5",
     "pyarrow>=10.0.0",
 ]
@@ -40,9 +40,15 @@ dev = [
 rowlineage = "dbt_rowlineage.plugin:RowLineagePlugin"
 
 [build-system]
-requires = ["setuptools", "wheel"]
+requires = ["setuptools>=65", "wheel"]
 build-backend = "setuptools.build_meta"
 
 [tool.setuptools]
-packages = { find = { exclude = ["demo*", "tests*"] } }
 include-package-data = true
+
+[tool.setuptools.packages.find]
+include = ["dbt_rowlineage*"]
+exclude = ["demo*", "tests*"]
+
+[tool.setuptools.dynamic]
+version = { attr = "dbt_rowlineage.__version__" }

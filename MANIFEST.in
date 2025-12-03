@@ -2,3 +2,4 @@ include README.md
 include LICENSE
 include pyproject.toml
 recursive-include dbt_rowlineage *.py
+recursive-include dbt_rowlineage *.sql *.yml *.yaml *.json

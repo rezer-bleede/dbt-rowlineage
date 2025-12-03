@@ -67,3 +67,14 @@ Install dependencies and run the test suite:
 pip install -e .[dev]
 pytest
 ```
+
+## Publishing
+
+To publish a new version to PyPI:
+
+1. Update the version string in `dbt_rowlineage/__init__.py` (e.g., `__version__ = "0.1.1"`).
+2. Commit the change and push it to the default branch.
+3. In GitHub, navigate to **Releases** and choose **Draft new release**.
+4. Create a tag that matches the version number prefixed with `v` (for example, `v0.1.1`), then publish the release.
+
+When the release is published, GitHub Actions builds the source distribution and wheel and uploads both to PyPI automatically using the configured secrets. No additional manual publishing steps are required.
