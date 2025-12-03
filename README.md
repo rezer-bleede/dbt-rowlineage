@@ -4,8 +4,10 @@ A dbt adapter-agnostic plugin that adds row-level lineage tracing to dbt model e
 
 ## Installation
 
+Install the published package directly from PyPI:
+
 ```bash
-pip install .
+pip install dbt-rowlineage
 ```
 
 The package registers an entrypoint under `dbt.adapters` named `rowlineage`, allowing dbt to discover the plugin automatically.
@@ -25,7 +27,7 @@ models:
 
 ## How it works
 
-1. **Compilation hook**: during SQL rendering the plugin injects `{{ rowlineage_uuid() }} as _row_trace_id` into the top-level `SELECT` list when it is not already present.
+1. **Compilation hook**: during SQL rendering the plugin injects a trace expression into the top-level `SELECT` list when `_row_trace_id` is not already present.
 2. **Execution hook**: after model execution the plugin captures input and output rows, pairs their trace ids, and writes mappings into the `lineage__mappings` table (or to JSONL/Parquet when configured).
 3. **Deterministic IDs**: UUIDs are produced deterministically from row content to keep tests reproducible.
 
@@ -46,11 +48,22 @@ The lineage mapping table schema:
 - **Parquet**: write mappings to a Parquet file (overwrites existing file).
 - **Database table**: insert mappings into `lineage__mappings` via the provided database connection.
 
+## Demo with Docker Compose
+
+A ready-to-run demo lives in the `demo/` directory and uses Docker Compose to provision Postgres, install `dbt-rowlineage` from PyPI, and run dbt end-to-end. From the repository root:
+
+```bash
+cd demo
+docker-compose up --build
+```
+
+Lineage artifacts are written to `demo/output/lineage/`. See `demo/README.md` for full instructions and an example JSONL record.
+
 ## Development
 
 Install dependencies and run the test suite:
 
 ```bash
-pip install -e .
+pip install -e .[dev]
 pytest
 ```

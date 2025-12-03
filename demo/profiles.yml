@@ -1,0 +1,12 @@
+rowlineage_demo:
+  target: dev
+  outputs:
+    dev:
+      type: postgres
+      host: postgres
+      user: demo
+      password: demo
+      port: 5432
+      dbname: demo
+      schema: public
+      threads: 4

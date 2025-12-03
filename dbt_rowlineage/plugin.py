@@ -15,7 +15,7 @@ from .utils.sql import TRACE_COLUMN
 
 class RowLineagePlugin:
     name = "rowlineage"
-    version = "0.1.0"
+    version = "0.2.0"
 
     def __init__(self) -> None:
         self.config = RowLineageConfig()

@@ -1,0 +1,31 @@
+name: rowlineage_demo
+version: 1.0.0
+config-version: 2
+profile: rowlineage_demo
+
+target-path: target
+clean-targets:
+  - target
+  - dbt_packages
+  - logs
+
+model-paths: ["models"]
+seed-paths: ["models"]
+
+vars:
+  rowlineage: true
+
+models:
+  rowlineage_demo:
+    +materialized: table
+    +rowlineage_enabled: true
+    +rowlineage_export_format: jsonl
+    +rowlineage_export_path: output/lineage/lineage.jsonl
+    staging:
+      +schema: staging
+    marts:
+      +schema: marts
+
+seeds:
+  rowlineage_demo:
+    +schema: staging

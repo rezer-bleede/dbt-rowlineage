@@ -2,4 +2,6 @@
 
 from .plugin import RowLineagePlugin
 
-__all__ = ["RowLineagePlugin"]
+__version__ = "0.2.0"
+
+__all__ = ["RowLineagePlugin", "__version__"]
