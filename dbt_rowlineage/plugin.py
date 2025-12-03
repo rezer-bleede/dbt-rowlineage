@@ -6,6 +6,7 @@ import importlib
 import importlib.util
 from typing import Any, Dict
 
+from . import __version__
 from .compiler_patch import patch_compiled_sql
 from .config import RowLineageConfig
 from .runtime_patch import capture_lineage
@@ -15,7 +16,7 @@ from .utils.sql import TRACE_COLUMN
 
 class RowLineagePlugin:
     name = "rowlineage"
-    version = "0.2.0"
+    version = __version__
 
     def __init__(self) -> None:
         self.config = RowLineageConfig()

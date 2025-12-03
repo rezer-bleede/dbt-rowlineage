@@ -11,8 +11,15 @@ def load_pyproject():
 
 
 def test_version_matches_pyproject():
-    project = load_pyproject()["project"]
-    assert project["version"] == __version__ == RowLineagePlugin.version
+    pyproject = load_pyproject()
+    project = pyproject["project"]
+
+    assert "version" not in project
+    assert "version" in project["dynamic"]
+
+    dynamic_version = pyproject["tool"]["setuptools"]["dynamic"]["version"]
+    assert dynamic_version["attr"] == "dbt_rowlineage.__version__"
+    assert __version__ == RowLineagePlugin.version
 
 
 def test_dependencies_include_dbt_core():
@@ -28,5 +35,7 @@ def test_manifest_includes_docs():
 
 def test_publish_workflow_uses_release_tags():
     workflow = Path(".github/workflows/publish.yml").read_text()
-    assert "v*" in workflow
+    assert "release:" in workflow
+    assert "types: [published]" in workflow
+    assert "startsWith(github.event.release.tag_name, 'v')" in workflow
     assert "twine upload" in workflow

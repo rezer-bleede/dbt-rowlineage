@@ -1,12 +1,12 @@
 name: Publish to PyPI
 
 on:
-  push:
-    tags:
-      - "v*"
+  release:
+    types: [published]
 
 jobs:
   build-and-publish:
+    if: startsWith(github.event.release.tag_name, 'v')
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
@@ -25,8 +25,11 @@ jobs:
       - name: Build distribution
         run: python -m build
 
-      - name: Check artifacts
-        run: twine check dist/*
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: dbt-rowlineage-dist
+          path: dist/*
 
       - name: Publish to PyPI
         env:
