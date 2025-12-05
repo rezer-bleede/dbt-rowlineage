@@ -20,3 +20,9 @@ def test_patch_handles_distinct():
     raw = "select distinct id from t"
     patched = normalize_whitespace(patch_compiled_sql(raw))
     assert patched.startswith(f"select distinct {TRACE_EXPRESSION} as {TRACE_COLUMN}, id")
+
+
+def test_patch_strips_jinja_from_sql():
+    raw = "select id from t"
+    patched = patch_compiled_sql(raw)
+    assert "{{" not in patched and "}}" not in patched
