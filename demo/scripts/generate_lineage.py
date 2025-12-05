@@ -7,6 +7,8 @@ import psycopg2
 from dbt_rowlineage.compiler_patch import patch_compiled_sql
 from dbt_rowlineage.runtime_patch import capture_lineage
 from dbt_rowlineage.tracer import MappingRecord
+from dbt_rowlineage.utils.sql import TRACE_COLUMN
+from dbt_rowlineage.utils.uuid import new_trace_id
 from dbt_rowlineage.writers.jsonl_writer import JSONLWriter
 from dbt_rowlineage.writers.parquet_writer import ParquetWriter
 
@@ -15,7 +17,13 @@ def fetch_rows(conn, sql: str) -> List[dict]:
     with conn.cursor() as cur:
         cur.execute(sql)
         columns = [c[0] for c in cur.description]
-        return [dict(zip(columns, row)) for row in cur.fetchall()]
+        rows = [dict(zip(columns, row)) for row in cur.fetchall()]
+
+    if TRACE_COLUMN not in columns:
+        for row in rows:
+            row[TRACE_COLUMN] = new_trace_id(row)
+
+    return rows
 
 
 def write_outputs(mappings: Iterable[MappingRecord], output_dir: Path) -> None:

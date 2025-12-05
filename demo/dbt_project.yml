@@ -10,7 +10,7 @@ clean-targets:
   - logs
 
 model-paths: ["models"]
-seed-paths: ["models"]
+seed-paths: ["seeds"]
 
 vars:
   rowlineage: true

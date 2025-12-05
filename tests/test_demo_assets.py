@@ -13,10 +13,28 @@ def test_compose_waits_for_postgres():
     assert "postgres" in compose
 
 
+def test_compose_includes_sqlmesh_ui():
+    compose = Path("demo/docker-compose.yml").read_text()
+    assert "sqlmesh" in compose
+    assert "8000:8000" in compose
+    assert "sqlmesh/Dockerfile" in compose
+
+
 def test_dbt_project_exports_lineage():
     project = Path("demo/dbt_project.yml").read_text()
     assert "rowlineage_export_path" in project
     assert "output/lineage/lineage.jsonl" in project
+
+
+def test_dbt_project_paths_align():
+    project = Path("demo/dbt_project.yml").read_text()
+    assert "model-paths: [\"models\"]" in project
+    assert "seed-paths: [\"seeds\"]" in project
+
+
+def test_packages_file_present():
+    packages = Path("demo/packages.yml").read_text()
+    assert "packages:" in packages
 
 
 def test_lineage_script_exports_both_formats():

@@ -6,7 +6,7 @@ import re
 
 TRACE_COLUMN = "_row_trace_id"
 TRACE_ALIAS = f"{TRACE_COLUMN}"
-TRACE_EXPRESSION = "{{ rowlineage_uuid() }}"
+TRACE_EXPRESSION = "md5(random()::text || clock_timestamp()::text)::uuid"
 
 
 def has_trace_column(sql: str) -> bool:
