@@ -14,4 +14,4 @@ RUN pip install --no-cache-dir --upgrade pip \
 
 EXPOSE 8000
 
-CMD ["sqlmesh", "ui", "start", "--host", "0.0.0.0", "--port", "8000", "--config", "/app/sqlmesh/sqlmesh.yaml"]
+CMD ["sqlmesh", "ui", "--host", "0.0.0.0", "--port", "8000", "-p", "demo"]

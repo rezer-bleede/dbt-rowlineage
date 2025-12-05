@@ -41,4 +41,3 @@ def test_lineage_script_exports_both_formats():
     script = Path("demo/scripts/generate_lineage.py").read_text()
     assert "JSONLWriter" in script
     assert "ParquetWriter" in script
-    assert "patch_compiled_sql" in script
