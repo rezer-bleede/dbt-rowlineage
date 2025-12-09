@@ -1,5 +1,5 @@
-id,customer_name,region
-1,Alice,North
-2,Bob,South
-3,Carol,West
-4,David,North
+_row_trace_id,id,customer_name,region
+a1b2c3d4-e5f6-7890-1234-567890abcdef,1,Alice,North
+b2c3d4e5-f6a7-8901-2345-67890abcdef1,2,Bob,South
+c3d4e5f6-a7b8-9012-3456-7890abcdef12,3,Carol,West
+d4e5f6a7-b8c9-0123-4567-890abcdef123,4,David,North
