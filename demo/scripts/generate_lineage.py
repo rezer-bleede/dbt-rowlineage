@@ -4,7 +4,7 @@ from typing import Iterable, List
 
 import psycopg2
 
-from dbt_rowlineage.runtime.capture_lineage import capture_lineage
+from dbt_rowlineage.runtime_patch import capture_lineage
 from dbt_rowlineage.tracer import MappingRecord
 from dbt_rowlineage.utils.sql import TRACE_COLUMN
 from dbt_rowlineage.utils.uuid import new_trace_id
@@ -44,30 +44,34 @@ def main() -> None:
     try:
         source_rows = fetch_rows(
             conn,
-            "select id, customer_name, region from example_source order by id",
+            "select id, customer_name, region from public_staging.example_source order by id",
         )
         staging_rows = fetch_rows(
             conn,
-            "select id, customer_name_upper, region, concat(region, '-', id) as customer_key from staging_model order by id",
+            "select id, customer_name_upper, region, concat(region, '-', id) as customer_key from public_staging.staging_model order by id",
         )
         mart_rows = fetch_rows(
             conn,
-            "select id, customer_name_upper, region, customer_key from mart_model order by id",
+            "select id, customer_name_upper, region, customer_key from public_marts.mart_model order by id",
         )
 
         mappings: List[MappingRecord] = []
         mappings.extend(
             capture_lineage(
-                source_rows,
-                staging_rows,
-                "select * from staging_model",
+                source_rows=source_rows,
+                target_rows=staging_rows,
+                source_model="example_source",
+                target_model="staging_model",
+                compiled_sql="select * from public_staging.staging_model",
             )
         )
         mappings.extend(
             capture_lineage(
-                staging_rows,
-                mart_rows,
-                "select * from mart_model",
+                source_rows=staging_rows,
+                target_rows=mart_rows,
+                source_model="staging_model",
+                target_model="mart_model",
+                compiled_sql="select * from public_marts.mart_model",
             )
         )
         write_outputs(mappings, Path("/demo/output/lineage"))

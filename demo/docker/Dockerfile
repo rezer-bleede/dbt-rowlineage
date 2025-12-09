@@ -12,6 +12,7 @@ WORKDIR /demo
 COPY . /demo
 
 RUN pip install --no-cache-dir --upgrade pip \
-    && pip install --no-cache-dir dbt-postgres dbt-rowlineage
+    && pip install --no-cache-dir dbt-postgres \
+    && pip install --no-cache-dir -e /demo
 
 ENTRYPOINT ["/bin/bash", "-c", "mkdir -p /demo/output/lineage && dbt deps && dbt seed --full-refresh && dbt run && python scripts/generate_lineage.py"]

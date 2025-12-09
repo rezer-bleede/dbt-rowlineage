@@ -21,3 +21,8 @@ htmlcov/
 
 # OS files
 .DS_Store
+
+# Demo artifacts
+demo/logs/
+demo/output/
+docker_compose_output.log
