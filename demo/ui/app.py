@@ -78,12 +78,32 @@ class LineageRepository:
         if not schema_table:
             return None
         schema, table = schema_table
-        sql = (
-            f"select * from {schema}.{table} where {TRACE_COLUMN} = %s "
-            "order by id limit 1"
-        )
-        rows = self._fetch_rows(sql, (trace_id,))
-        return rows[0] if rows else None
+        
+        # First check if the table has the trace column
+        with self._connect() as conn:
+            with conn.cursor() as cur:
+                cur.execute(f"SELECT column_name FROM information_schema.columns WHERE table_schema = %s AND table_name = %s AND column_name = %s", 
+                           (schema, table, TRACE_COLUMN))
+                has_trace_column = cur.fetchone() is not None
+        
+        if has_trace_column:
+            # Table has trace column, query by trace ID
+            sql = (
+                f"select * from {schema}.{table} where {TRACE_COLUMN} = %s "
+                "order by id limit 1"
+            )
+            rows = self._fetch_rows(sql, (trace_id,))
+            return rows[0] if rows else None
+        else:
+            # Table doesn't have trace column (e.g., seed tables)
+            # Fetch all rows and generate trace IDs, then find the matching one
+            sql = f"select * from {schema}.{table} order by id"
+            rows = self._fetch_rows(sql)
+            # Find the row that would have this trace ID
+            for row in rows:
+                if row.get(TRACE_COLUMN) == trace_id:
+                    return row
+            return None
 
     def _load_mappings(self) -> List[Mapping]:
         if not self.lineage_path.exists():
