@@ -15,11 +15,13 @@ docker-compose up --build
 ```
 
 The command builds a Python image that installs `dbt-postgres` and the published `dbt-rowlineage` package, waits for Postgres to become healthy, runs the dbt project, and executes a lineage export script.
+It also starts a small UI service that can render mart rows and their upstream lineage.
 
 ## What gets created
 
 - **Database:** Postgres database `demo` with `example_source`, `staging_model`, and `mart_model` tables.
 - **Lineage output:** JSONL and Parquet files written to `output/lineage/` in your working directory.
+- **Lineage UI:** A FastAPI-powered UI available at http://localhost:8080 that lists mart records and lets you click a row to see upstream lineage.
 - **Trace columns:** The plugin injects `_row_trace_id` into compiled SQL used by the export script so mappings can be generated deterministically.
 
 Example JSONL line:
@@ -36,7 +38,7 @@ Parquet output contains the same columns.
 - `models/` contains staging and mart models that keep row counts aligned to make lineage easy to inspect.
 - `seeds/` stores the seed data (`example_source.csv`).
 - `docker/Dockerfile` installs `dbt-postgres` and `dbt-rowlineage` from PyPI and runs dbt plus the lineage export script.
-- `docker-compose.yml` wires together the Postgres container, the dbt runner, and the SQLMesh UI, mounting `./output` so lineage artifacts are available on the host.
+- `docker-compose.yml` wires together the Postgres container, the dbt runner, the lineage UI, and the SQLMesh UI, mounting `./output` so lineage artifacts are available on the host.
 - `scripts/generate_lineage.py` patches SQL with `_row_trace_id`, captures lineage across the two model hops, and writes JSONL/Parquet outputs.
 
 ## SQLMesh UI
@@ -47,7 +49,7 @@ The demo now bundles [SQLMesh UI](https://sqlmesh.com/docs/ui) so you can explor
 - **Project mount:** The entire demo directory is mounted into `/app` inside the SQLMesh container, so saving a file in the UI updates the files on your host.
 - **dbt compatibility:** SQLMesh uses its built-in dbt compatibility to render the models defined in this project.
 
-The SQLMesh container waits for Postgres to become healthy before starting the UI.
+The SQLMesh container waits for Postgres to become healthy before starting the UI. The lineage UI waits for both Postgres and the dbt run so the sample data and lineage mappings are available when the page is loaded.
 
 ## Cleaning up
 
