@@ -1,0 +1,5 @@
+INFO:     Started server process [7285]
+INFO:     Waiting for application startup.
+INFO:     Application startup complete.
+INFO:     Uvicorn running on http://0.0.0.0:8080 (Press CTRL+C to quit)
+INFO:     127.0.0.1:51446 - "GET /api/lineage/f5dc976f-2e1d-53bd-9518-2af65550bc15 HTTP/1.1" 200 OK

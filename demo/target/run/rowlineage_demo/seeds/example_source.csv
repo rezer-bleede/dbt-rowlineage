@@ -1,0 +1,13 @@
+
+
+
+
+    create table "demo"."public_staging"."example_source" ("id" integer,"customer_name" text,"region" text,"_row_trace_id" text)
+  ;
+    -- dbt seed --
+
+          insert into "demo"."public_staging"."example_source" ("id", "customer_name", "region", "_row_trace_id") values
+          (%s,%s,%s,%s),(%s,%s,%s,%s),(%s,%s,%s,%s),(%s,%s,%s,%s)
+
+
+;
