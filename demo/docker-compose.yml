@@ -19,8 +19,8 @@ services:
 
   dbt-runner:
     build:
-      context: .
-      dockerfile: docker/Dockerfile
+      context: ..
+      dockerfile: demo/docker/Dockerfile
     environment:
       DBT_PROFILES_DIR: /demo
       PGPASSWORD: demo
