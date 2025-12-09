@@ -20,6 +20,13 @@ def test_compose_includes_sqlmesh_ui():
     assert "sqlmesh/Dockerfile" in compose
 
 
+def test_compose_includes_lineage_ui():
+    compose = Path("demo/docker-compose.yml").read_text()
+    assert "lineage-ui" in compose
+    assert "demo/ui/Dockerfile" in compose
+    assert "8080:8080" in compose
+
+
 def test_dbt_project_exports_lineage():
     project = Path("demo/dbt_project.yml").read_text()
     assert "rowlineage_export_path" in project

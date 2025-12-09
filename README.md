@@ -50,14 +50,14 @@ The lineage mapping table schema:
 
 ## Demo with Docker Compose
 
-A ready-to-run demo lives in the `demo/` directory and uses Docker Compose to provision Postgres, install `dbt-rowlineage` from PyPI, and run dbt end-to-end. From the repository root:
+A ready-to-run demo lives in the `demo/` directory and uses Docker Compose to provision Postgres, install `dbt-rowlineage` from PyPI, run dbt end-to-end, and expose a lightweight lineage explorer UI. From the repository root:
 
 ```bash
 cd demo
 docker-compose up --build
 ```
 
-Lineage artifacts are written to `demo/output/lineage/`. See `demo/README.md` for full instructions and an example JSONL record.
+Lineage artifacts are written to `demo/output/lineage/`. After the stack comes up, visit http://localhost:8080 to browse mart rows and trace them back to staging and source records. See `demo/README.md` for full instructions and an example JSONL record.
 
 ## Development
 

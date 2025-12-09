@@ -49,5 +49,25 @@ services:
       - ./:/app
     working_dir: /app
 
+  lineage-ui:
+    build:
+      context: ..
+      dockerfile: demo/ui/Dockerfile
+    depends_on:
+      postgres:
+        condition: service_healthy
+      dbt-runner:
+        condition: service_completed_successfully
+    environment:
+      DBT_DATABASE: demo
+      DBT_USER: demo
+      DBT_PASSWORD: demo
+      DBT_HOST: postgres
+      DBT_PORT: 5432
+    ports:
+      - "8080:8080"
+    volumes:
+      - ./output:/demo/output
+
 volumes:
   pgdata:

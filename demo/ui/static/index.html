@@ -1,0 +1,122 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Row Lineage Explorer</title>
+    <style>
+      body { font-family: Arial, sans-serif; margin: 20px; background: #f7f7f7; }
+      h1 { color: #203040; }
+      table { border-collapse: collapse; width: 100%; margin-top: 12px; background: white; }
+      th, td { border: 1px solid #e0e0e0; padding: 8px; text-align: left; }
+      th { background: #fafafa; }
+      tr:hover { background: #f0f7ff; }
+      .card { background: white; padding: 16px; border: 1px solid #e0e0e0; border-radius: 6px; margin-top: 16px; }
+      .muted { color: #555; }
+      .pill { display: inline-block; padding: 2px 8px; background: #eef3ff; border: 1px solid #c6d4ff; border-radius: 10px; font-size: 12px; margin-left: 6px; }
+      .hops { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 12px; margin-top: 12px; }
+      .hop { border: 1px solid #e0e0e0; border-radius: 6px; padding: 12px; background: #fafafa; }
+      button { padding: 6px 12px; border: none; background: #264b92; color: white; border-radius: 4px; cursor: pointer; }
+      button:hover { background: #1c3a73; }
+      #status { margin-top: 8px; }
+      code { background: #f3f3f3; padding: 2px 4px; border-radius: 4px; }
+    </style>
+  </head>
+  <body>
+    <h1>Row Level Lineage Explorer</h1>
+    <p class="muted">Inspect mart records and trace each row back through staging to its source record.</p>
+    <div class="card">
+      <div style="display: flex; justify-content: space-between; align-items: center;">
+        <h2>Mart rows</h2>
+        <button id="refresh">Refresh</button>
+      </div>
+      <div id="status" class="muted">Loading mart rows…</div>
+      <table id="mart-table" aria-label="Mart rows">
+        <thead>
+          <tr>
+            <th>ID</th>
+            <th>Customer</th>
+            <th>Region</th>
+            <th>Customer Key</th>
+            <th>Trace ID</th>
+          </tr>
+        </thead>
+        <tbody></tbody>
+      </table>
+    </div>
+
+    <div id="lineage" class="card" style="display: none;">
+      <h2>Lineage</h2>
+      <div id="target"></div>
+      <div class="hops" id="hops"></div>
+    </div>
+
+    <script>
+      const martTable = document.querySelector('#mart-table tbody');
+      const status = document.querySelector('#status');
+      const lineageCard = document.querySelector('#lineage');
+      const hops = document.querySelector('#hops');
+      const target = document.querySelector('#target');
+      const refreshButton = document.querySelector('#refresh');
+
+      async function loadMartRows() {
+        status.textContent = 'Loading mart rows…';
+        martTable.innerHTML = '';
+        const res = await fetch('/api/mart_rows');
+        if (!res.ok) {
+          status.textContent = 'Unable to load mart rows.';
+          return;
+        }
+        const data = await res.json();
+        status.textContent = `Loaded ${data.rows.length} mart rows.`;
+        data.rows.forEach(row => {
+          const tr = document.createElement('tr');
+          tr.innerHTML = `
+            <td>${row.id}</td>
+            <td>${row.customer_name_upper ?? row.customer_name}</td>
+            <td>${row.region}</td>
+            <td>${row.customer_key || ''}</td>
+            <td><code>${row._row_trace_id}</code></td>
+          `;
+          tr.addEventListener('click', () => loadLineage(row._row_trace_id));
+          martTable.appendChild(tr);
+        });
+      }
+
+      async function loadLineage(traceId) {
+        hops.innerHTML = '';
+        lineageCard.style.display = 'block';
+        target.textContent = 'Loading lineage…';
+        const res = await fetch(`/api/lineage/${traceId}`);
+        if (!res.ok) {
+          target.textContent = 'Lineage unavailable for this record.';
+          return;
+        }
+        const data = await res.json();
+        target.innerHTML = `<strong>Selected trace:</strong> <code>${traceId}</code>`;
+        data.hops.forEach(hop => {
+          const div = document.createElement('div');
+          div.className = 'hop';
+          const row = hop.row || {};
+          div.innerHTML = `
+            <div><strong>${hop.source_model}</strong> <span class="pill">-> ${hop.target_model}</span></div>
+            <div class="muted">Source trace: <code>${hop.source_trace_id}</code></div>
+            <div class="muted">Target trace: <code>${hop.target_trace_id}</code></div>
+            <div style="margin-top: 8px;">
+              <div><strong>Row values</strong></div>
+              <div>ID: ${row.id ?? 'n/a'}</div>
+              <div>Name: ${row.customer_name_upper ?? row.customer_name ?? 'n/a'}</div>
+              <div>Region: ${row.region ?? 'n/a'}</div>
+            </div>
+            <div style="margin-top: 8px;" class="muted">Compiled SQL: ${hop.compiled_sql || 'N/A'}</div>
+            <div class="muted">Executed at: ${hop.executed_at || 'N/A'}</div>
+          `;
+          hops.appendChild(div);
+        });
+      }
+
+      refreshButton.addEventListener('click', loadMartRows);
+      loadMartRows();
+    </script>
+  </body>
+</html>

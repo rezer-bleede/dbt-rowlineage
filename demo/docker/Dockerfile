@@ -15,7 +15,7 @@ COPY MANIFEST.in .
 COPY dbt_rowlineage ./dbt_rowlineage
 
 RUN pip install --no-cache-dir --upgrade pip \
-    && pip install --no-cache-dir dbt-postgres \
+    && pip install --no-cache-dir dbt-postgres dbt-rowlineage \
     && pip install --no-cache-dir -e .
 
 ENTRYPOINT ["/bin/bash", "-c", "mkdir -p /demo/output/lineage && dbt deps && dbt seed --full-refresh && dbt run && python scripts/generate_lineage.py"]
