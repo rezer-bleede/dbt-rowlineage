@@ -64,8 +64,6 @@ services:
     depends_on:
       postgres:
         condition: service_healthy
-      dbt-runner:
-        condition: service_completed_successfully
     environment:
       DBT_DATABASE: demo
       DBT_USER: demo
