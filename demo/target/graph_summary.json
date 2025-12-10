@@ -1,1 +1,0 @@
-{"_invocation_id": "3d1f353b-b412-4bef-a706-a454d4f9d80f", "linked": {"0": {"name": "model.rowlineage_demo.mart_model", "type": "model"}, "1": {"name": "model.rowlineage_demo.staging_model", "type": "model", "succ": [0]}, "2": {"name": "seed.rowlineage_demo.example_source", "type": "seed", "succ": [1]}}}
