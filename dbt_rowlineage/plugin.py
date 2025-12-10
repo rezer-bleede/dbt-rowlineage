@@ -52,6 +52,25 @@ class RowLineagePlugin:
     ):
         return capture_lineage(source_rows, target_rows, source_model, target_model, compiled_sql, self.config)
 
+    def capture_lineage(
+        self,
+        source_rows,
+        target_rows,
+        source_model: str,
+        target_model: str,
+        compiled_sql: str,
+    ):
+        """Public surface for downstream callers to capture lineage."""
+
+        return capture_lineage(
+            source_rows=source_rows,
+            target_rows=target_rows,
+            source_model=source_model,
+            target_model=target_model,
+            compiled_sql=compiled_sql,
+            config=self.config,
+        )
+
 
 __all__ = [
     "RowLineagePlugin",
