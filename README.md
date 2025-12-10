@@ -10,7 +10,7 @@ Install the published package directly from PyPI:
 pip install dbt-rowlineage
 ```
 
-The package registers an entrypoint under `dbt.adapters` named `rowlineage`, allowing dbt to discover the plugin automatically.
+After installation the plugin is discovered automatically by dbt; keep using your existing adapter (for example `postgres`, `bigquery`, or `snowflake`) and enable row lineage with vars and model configs.
 
 ## Configuration
 

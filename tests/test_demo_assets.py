@@ -48,3 +48,10 @@ def test_lineage_script_exports_both_formats():
     script = Path("demo/scripts/generate_lineage.py").read_text()
     assert "JSONLWriter" in script
     assert "ParquetWriter" in script
+
+
+def test_profile_uses_base_adapter():
+    profile = Path("demo/profiles.yml").read_text()
+    assert "type: postgres" in profile
+    assert "type: rowlineage" not in profile
+    assert "base_adapter" not in profile
