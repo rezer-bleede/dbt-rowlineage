@@ -1,4 +1,4 @@
 packages:
-  - git: "https://github.com/rezer0-bleed3/dbt-rowlineage.git"
+  - git: "https://github.com/rezer-bleede/dbt-rowlineage.git"
     subdirectory: integration/dbt
     revision: main
