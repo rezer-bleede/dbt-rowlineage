@@ -7,6 +7,7 @@ from pathlib import Path
 from typing import Any, Dict, Iterable, List, Sequence, Tuple
 
 from .plugin import RowLineagePlugin
+from .runtime_patch import capture_lineage
 from .tracer import MappingRecord
 from .utils.sql import TRACE_COLUMN
 from .writers.jsonl_writer import JSONLWriter
@@ -125,12 +126,13 @@ def generate_lineage_for_project(
 
         compiled_sql: str = downstream.get("compiled_code") or ""
 
-        mappings = plugin.capture_lineage(
+        mappings = capture_lineage(
             source_rows=upstream_rows,
             target_rows=downstream_rows,
             source_model=upstream.get("name", ""),
             target_model=downstream.get("name", ""),
             compiled_sql=compiled_sql,
+            config=plugin.config,
         )
         if mappings:
             writer.write(mappings)
