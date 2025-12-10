@@ -2,8 +2,7 @@ rowlineage_demo:
   target: dev
   outputs:
     dev:
-      type: rowlineage
-      base_adapter: postgres
+      type: postgres
       host: postgres
       user: demo
       password: demo

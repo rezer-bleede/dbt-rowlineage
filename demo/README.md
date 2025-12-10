@@ -1,6 +1,6 @@
 # dbt-rowlineage Demo
 
-This demo runs dbt against a lightweight Postgres container while the `dbt-rowlineage` adapter injects trace IDs and exports row-level lineage.
+This demo runs dbt against a lightweight Postgres container while the `dbt-rowlineage` plugin injects trace IDs and exports row-level lineage.
 
 ## Prerequisites
 
@@ -16,6 +16,8 @@ docker-compose up --build
 
 The command builds a Python image that installs `dbt-postgres` and the published `dbt-rowlineage` package, waits for Postgres to become healthy, runs the dbt project, and executes a lineage export script.
 It also starts a small UI service that can render mart rows and their upstream lineage.
+
+> **Note:** Earlier iterations of this demo referenced a `rowlineage` adapter type. The plugin is adapter-agnostic, so the bundled `profiles.yml` now uses the standard `postgres` adapter to avoid dbt import errors.
 
 ## What gets created
 
@@ -34,8 +36,8 @@ Parquet output contains the same columns.
 
 ## Project layout
 
-- `dbt_project.yml` and `profiles.yml` configure dbt for the Postgres service using the `rowlineage` adapter backed by Postgres.
-- `packages.yml` installs the `dbt-rowlineage` dbt adapter package directly from GitHub so dbt can load the custom adapter.
+- `dbt_project.yml` and `profiles.yml` configure dbt for the Postgres service using the standard `postgres` adapter with rowlineage enabled via vars and model configs.
+- `packages.yml` installs the `dbt-rowlineage` plugin package so dbt can load the hooks that instrument compilation and execution.
 - `models/` contains staging and mart models that keep row counts aligned to make lineage easy to inspect.
 - `seeds/` stores the seed data (`example_source.csv`).
 - `docker/Dockerfile` installs `dbt-postgres` and the `dbt-rowlineage` adapter from PyPI and runs dbt plus the lineage export script.
