@@ -56,3 +56,7 @@ exclude = ["demo*", "tests*"]
 
 [tool.setuptools.dynamic]
 version = { attr = "dbt_rowlineage.__version__" }
+
+[project.scripts]
+dbt-rowlineage = "dbt_rowlineage.cli:main"
+
