@@ -1,80 +1,32 @@
 import os
 from pathlib import Path
-from typing import Iterable, List
 
 import psycopg2
 
-from dbt_rowlineage.runtime_patch import capture_lineage
-from dbt_rowlineage.tracer import MappingRecord
-from dbt_rowlineage.utils.sql import TRACE_COLUMN
-from dbt_rowlineage.utils.uuid import new_trace_id
-from dbt_rowlineage.writers.jsonl_writer import JSONLWriter
-from dbt_rowlineage.writers.parquet_writer import ParquetWriter
+from dbt_rowlineage.auto import generate_lineage_for_project
 
 
-def fetch_rows(conn, sql: str) -> List[dict]:
-    with conn.cursor() as cur:
-        cur.execute(sql)
-        columns = [c[0] for c in cur.description]
-        rows = [dict(zip(columns, row)) for row in cur.fetchall()]
+def _get_connection():
+    host = os.getenv("DBT_HOST", "postgres")
+    port = int(os.getenv("DBT_PORT", "5432"))
+    database = os.getenv("DBT_DATABASE", "demo")
+    user = os.getenv("DBT_USER", "demo_user")
+    password = os.getenv("DBT_PASSWORD", "demo_password")
 
-    if TRACE_COLUMN not in columns:
-        for row in rows:
-            row[TRACE_COLUMN] = new_trace_id(row)
-
-    return rows
-
-
-def write_outputs(mappings: Iterable[MappingRecord], output_dir: Path) -> None:
-    output_dir.mkdir(parents=True, exist_ok=True)
-    mappings = list(mappings)
-    JSONLWriter(output_dir / "lineage.jsonl").write(mappings)
-    ParquetWriter(output_dir / "lineage.parquet").write(mappings)
+    return psycopg2.connect(
+        host=host,
+        port=port,
+        dbname=database,
+        user=user,
+        password=password,
+    )
 
 
 def main() -> None:
-    conn = psycopg2.connect(
-        dbname=os.getenv("DBT_DATABASE", "demo"),
-        user=os.getenv("DBT_USER", "demo"),
-        password=os.getenv("DBT_PASSWORD", "demo"),
-        host=os.getenv("DBT_HOST", "postgres"),
-        port=int(os.getenv("DBT_PORT", "5432")),
-    )
-
+    project_root = Path(os.getenv("DBT_PROJECT_ROOT", "/demo"))
+    conn = _get_connection()
     try:
-        source_rows = fetch_rows(
-            conn,
-            "select id, customer_name, region from public_staging.example_source order by id",
-        )
-        staging_rows = fetch_rows(
-            conn,
-            "select id, customer_name_upper, region, concat(region, '-', id) as customer_key from public_staging.staging_model order by id",
-        )
-        mart_rows = fetch_rows(
-            conn,
-            "select id, customer_name_upper, region, customer_key from public_marts.mart_model order by id",
-        )
-
-        mappings: List[MappingRecord] = []
-        mappings.extend(
-            capture_lineage(
-                source_rows=source_rows,
-                target_rows=staging_rows,
-                source_model="example_source",
-                target_model="staging_model",
-                compiled_sql="select * from public_staging.staging_model",
-            )
-        )
-        mappings.extend(
-            capture_lineage(
-                source_rows=staging_rows,
-                target_rows=mart_rows,
-                source_model="staging_model",
-                target_model="mart_model",
-                compiled_sql="select * from public_marts.mart_model",
-            )
-        )
-        write_outputs(mappings, Path("/demo/output/lineage"))
+        generate_lineage_for_project(conn=conn, project_root=project_root)
     finally:
         conn.close()
 
