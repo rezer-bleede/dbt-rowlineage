@@ -1,4 +1,1 @@
-packages:
-  - git: "https://github.com/rezer-bleede/dbt-rowlineage.git"
-    subdirectory: integration/dbt
-    revision: main
+packages: []
