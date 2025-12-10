@@ -1,7 +1,6 @@
 {{ config(materialized='table', schema='staging') }}
 
 select
-  md5(random()::text || clock_timestamp()::text)::uuid as _row_trace_id,
   id,
   customer_name,
   region,
