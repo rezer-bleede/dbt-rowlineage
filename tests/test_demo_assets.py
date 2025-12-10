@@ -39,6 +39,12 @@ def test_dbt_project_paths_align():
     assert "seed-paths: [\"seeds\"]" in project
 
 
+def test_dockerfile_runs_seed_before_models():
+    dockerfile = Path("demo/docker/Dockerfile").read_text()
+    assert "dbt deps && dbt seed --full-refresh && dbt run" in dockerfile
+    assert "dbt run && dbt deps" not in dockerfile
+
+
 def test_packages_file_present():
     packages = Path("demo/packages.yml").read_text()
     assert "packages:" in packages
@@ -55,3 +61,10 @@ def test_profile_uses_base_adapter():
     assert "type: postgres" in profile
     assert "type: rowlineage" not in profile
     assert "base_adapter" not in profile
+
+
+def test_gitignore_excludes_dbt_artifacts():
+    gitignore = Path(".gitignore").read_text()
+    assert "demo/target/" in gitignore
+    assert "target/" in gitignore
+    assert "dbt_packages/" in gitignore

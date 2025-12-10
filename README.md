@@ -57,7 +57,9 @@ cd demo
 docker-compose up --build
 ```
 
-Lineage artifacts are written to `demo/output/lineage/`. After the stack comes up, visit http://localhost:8080 to browse mart rows and trace them back to staging and source records. See `demo/README.md` for full instructions and an example JSONL record.
+Lineage artifacts are written to `demo/output/lineage/`. The Compose entrypoint now installs packages and seeds the demo data before the first `dbt run`, preventing missing table errors for `example_source`. After the stack comes up, visit http://localhost:8080 to browse mart rows and trace them back to staging and source records. See `demo/README.md` for full instructions and an example JSONL record.
+
+> Tip: dbt-generated artifacts such as `target/`, `dbt_packages/`, and `logs/` are ignored via `.gitignore` to keep compiled files out of the repository.
 
 ## Development
 
