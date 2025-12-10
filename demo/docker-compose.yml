@@ -21,12 +21,21 @@ services:
     build:
       context: ..
       dockerfile: demo/docker/Dockerfile
+    restart: unless-stopped
     environment:
       DBT_PROFILES_DIR: /demo
       PGPASSWORD: demo
     depends_on:
       postgres:
         condition: service_healthy
+    command: >
+      bash -c "
+        dbt deps &&
+        dbt seed &&
+        dbt run &&
+        python3 scripts/generate_lineage.py &&
+        tail -f /dev/null
+      "
     volumes:
       - ./output:/demo/output
 
