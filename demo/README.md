@@ -17,6 +17,8 @@ docker-compose up --build
 The command builds a Python image that installs `dbt-postgres` and the published `dbt-rowlineage` package, waits for Postgres to become healthy, installs dbt packages, seeds the example data, runs the dbt project, and executes a lineage export script.
 It also starts a small UI service that can render mart rows and their upstream lineage.
 
+The bundled `dbt-rowlineage` CLI reads credentials from the demo's `profiles.yml`, so you don't need to manually export `DBT_DATABASE` or `DBT_USER` when the stack starts.
+
 > **Note:** Earlier iterations of this demo referenced a `rowlineage` adapter type. The plugin is adapter-agnostic, so the bundled `profiles.yml` now uses the standard `postgres` adapter to avoid dbt import errors.
 
 ## What gets created
