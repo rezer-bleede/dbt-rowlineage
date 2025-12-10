@@ -1,6 +1,6 @@
 # dbt-rowlineage Demo
 
-This demo runs dbt against a lightweight Postgres container while the `dbt-rowlineage` plugin, installed from PyPI, injects trace IDs and exports row-level lineage.
+This demo runs dbt against a lightweight Postgres container while the `dbt-rowlineage` adapter injects trace IDs and exports row-level lineage.
 
 ## Prerequisites
 
@@ -22,7 +22,7 @@ It also starts a small UI service that can render mart rows and their upstream l
 - **Database:** Postgres database `demo` with `example_source`, `staging_model`, and `mart_model` tables.
 - **Lineage output:** JSONL and Parquet files written to `output/lineage/` in your working directory.
 - **Lineage UI:** A FastAPI-powered UI available at http://localhost:8080 that lists mart records and lets you click a row to see upstream lineage.
-- **Trace columns:** The plugin injects `_row_trace_id` into compiled SQL used by the export script so mappings can be generated deterministically.
+- **Trace columns:** The adapter injects `_row_trace_id` into compiled SQL used by the export script so mappings can be generated deterministically.
 
 Example JSONL line:
 
@@ -34,10 +34,11 @@ Parquet output contains the same columns.
 
 ## Project layout
 
-- `dbt_project.yml` and `profiles.yml` configure dbt for the Postgres service.
+- `dbt_project.yml` and `profiles.yml` configure dbt for the Postgres service using the `rowlineage` adapter backed by Postgres.
+- `packages.yml` installs the `dbt-rowlineage` dbt adapter package directly from GitHub so dbt can load the custom adapter.
 - `models/` contains staging and mart models that keep row counts aligned to make lineage easy to inspect.
 - `seeds/` stores the seed data (`example_source.csv`).
-- `docker/Dockerfile` installs `dbt-postgres` and `dbt-rowlineage` from PyPI and runs dbt plus the lineage export script.
+- `docker/Dockerfile` installs `dbt-postgres` and the `dbt-rowlineage` adapter from PyPI and runs dbt plus the lineage export script.
 - `docker-compose.yml` wires together the Postgres container, the dbt runner, the lineage UI, and the SQLMesh UI, mounting `./output` so lineage artifacts are available on the host.
 - `scripts/generate_lineage.py` patches SQL with `_row_trace_id`, captures lineage across the two model hops, and writes JSONL/Parquet outputs.
 
