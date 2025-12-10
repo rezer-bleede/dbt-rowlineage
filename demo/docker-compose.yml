@@ -24,6 +24,11 @@ services:
     environment:
       DBT_PROFILES_DIR: /demo
       PGPASSWORD: demo
+      DBT_DATABASE: demo
+      DBT_USER: demo
+      DBT_PASSWORD: demo
+      DBT_HOST: postgres
+      DBT_PORT: "5432"
     depends_on:
       postgres:
         condition: service_healthy
