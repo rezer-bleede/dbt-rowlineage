@@ -26,3 +26,10 @@ htmlcov/
 demo/logs/
 demo/output/
 docker_compose_output.log
+
+# dbt artifacts (should be generated dynamically)
+demo/target/
+demo/dbt_packages/
+target/
+dbt_packages/
+logs/

@@ -14,6 +14,28 @@ cd demo
 docker-compose up --build
 ```
 
+### Running dbt manually (without Docker)
+
+If you need to run dbt manually or encounter the error "relation does not exist", follow these steps in order:
+
+```bash
+# 1. Install dependencies
+dbt deps
+
+# 2. Load seeds first (creates the example_source table)
+dbt seed
+
+# 3. Run models (now works because seed table exists)
+dbt run
+```
+
+Or use the provided script:
+```bash
+./run_demo.sh
+```
+
+**Important:** The seed must be loaded before running the models, as the `staging_model` references the `example_source` seed data.
+
 The command builds a Python image that installs `dbt-postgres` and the published `dbt-rowlineage` package, waits for Postgres to become healthy, runs the dbt project, and executes a lineage export script.
 It also starts a small UI service that can render mart rows and their upstream lineage.
 
