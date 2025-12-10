@@ -21,7 +21,6 @@ services:
     build:
       context: ..
       dockerfile: demo/docker/Dockerfile
-    restart: unless-stopped
     environment:
       DBT_PROFILES_DIR: /demo
       PGPASSWORD: demo
