@@ -50,10 +50,10 @@ def test_packages_file_present():
     assert "packages:" in packages
 
 
-def test_lineage_script_exports_both_formats():
-    script = Path("demo/scripts/generate_lineage.py").read_text()
-    assert "JSONLWriter" in script
-    assert "ParquetWriter" in script
+def test_docker_compose_runs_cli_lineage_export():
+    compose = Path("demo/docker-compose.yml").read_text()
+    assert "dbt-rowlineage" in compose
+    assert "python3 scripts/generate_lineage.py" not in compose
 
 
 def test_profile_uses_base_adapter():

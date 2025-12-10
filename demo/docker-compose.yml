@@ -32,7 +32,7 @@ services:
         dbt deps &&
         dbt seed &&
         dbt run &&
-        python3 scripts/generate_lineage.py &&
+        dbt-rowlineage --project-root /demo &&
         tail -f /dev/null
       "
     volumes:
