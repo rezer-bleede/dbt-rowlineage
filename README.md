@@ -55,6 +55,8 @@ models:
 2. **Execution hook**: after model execution the plugin captures input and output rows, pairs their trace ids, and writes mappings into the `lineage__mappings` table (or to JSONL/Parquet when configured).
 3. **Deterministic IDs**: UUIDs are produced deterministically from row content to keep tests reproducible.
 
+The `RowLineagePlugin` exposes a `capture_lineage` method for callers that need to drive lineage collection manually (for example when using the `auto.generate_lineage_for_project` helper). The method mirrors the runtime hook signature and automatically reuses the plugin's active configuration.
+
 The lineage mapping table schema:
 
 | column          | description                              |
