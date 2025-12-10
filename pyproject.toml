@@ -3,7 +3,7 @@ name = "dbt-rowlineage"
 dynamic = ["version"]
 description = "Adapter-agnostic dbt plugin providing row-level lineage tracing"
 readme = { file = "README.md", content-type = "text/markdown" }
-authors = [{ name = "OpenAI", email = "dev@example.com" }]
+authors = [{ name = "RezerBleede", email = "remisharoon.aws@gmail.com" }]
 license = { file = "LICENSE" }
 keywords = ["dbt", "lineage", "analytics", "data-engineering"]
 classifiers = [
@@ -27,9 +27,9 @@ dependencies = [
 ]
 
 [project.urls]
-Homepage = "https://github.com/openai/dbt-rowlineage"
-Repository = "https://github.com/openai/dbt-rowlineage"
-Issues = "https://github.com/openai/dbt-rowlineage/issues"
+Homepage = "https://github.com/rezer-bleede/dbt-rowlineage"
+Repository = "https://github.com/rezer-bleede/dbt-rowlineage"
+Issues = "https://github.com/rezer-bleede/dbt-rowlineage/issues"
 
 [project.optional-dependencies]
 dev = [
