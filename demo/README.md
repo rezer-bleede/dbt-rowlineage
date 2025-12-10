@@ -14,17 +14,18 @@ cd demo
 docker-compose up --build
 ```
 
-The command builds a Python image that installs `dbt-postgres` and the published `dbt-rowlineage` package, waits for Postgres to become healthy, installs dbt packages, seeds the example data, runs the dbt project, and executes a lineage export script.
+The command builds a Python image that installs `dbt-postgres` and the published `dbt-rowlineage` package, waits for Postgres to become healthy, installs dbt packages, seeds the example data, runs the dbt project, and then calls the `dbt-rowlineage` CLI to export lineage.
 It also starts a small UI service that can render mart rows and their upstream lineage.
 
 The bundled `dbt-rowlineage` CLI reads credentials from the demo's `profiles.yml`, so you don't need to manually export `DBT_DATABASE` or `DBT_USER` when the stack starts.
+Override the output format or path by passing flags such as `--export-format parquet` or `--export-path /demo/output/lineage/lineage.parquet` to the CLI invocation.
 
 > **Note:** Earlier iterations of this demo referenced a `rowlineage` adapter type. The plugin is adapter-agnostic, so the bundled `profiles.yml` now uses the standard `postgres` adapter to avoid dbt import errors.
 
 ## What gets created
 
 - **Database:** Postgres database `demo` with `example_source`, `staging_model`, and `mart_model` tables.
-- **Lineage output:** JSONL and Parquet files written to `output/lineage/` in your working directory.
+- **Lineage output:** JSONL is written to `output/lineage/` in your working directory using the dbt project configuration. Switch to Parquet by updating `rowlineage_export_format` in `dbt_project.yml` or by passing CLI overrides.
 - **Lineage UI:** A FastAPI-powered UI available at http://localhost:8080 that lists mart records and lets you click a row to see upstream lineage.
 - **Trace columns:** The adapter injects `_row_trace_id` into compiled SQL used by the export script so mappings can be generated deterministically.
 
@@ -42,9 +43,8 @@ Parquet output contains the same columns.
 - `packages.yml` installs the `dbt-rowlineage` plugin package so dbt can load the hooks that instrument compilation and execution.
 - `models/` contains staging and mart models that keep row counts aligned to make lineage easy to inspect.
 - `seeds/` stores the seed data (`example_source.csv`).
-- `docker/Dockerfile` installs `dbt-postgres` and the `dbt-rowlineage` adapter from PyPI and runs dbt plus the lineage export script.
+- `docker/Dockerfile` installs `dbt-postgres` and the `dbt-rowlineage` adapter from PyPI and runs dbt plus the lineage export CLI.
 - `docker-compose.yml` wires together the Postgres container, the dbt runner, the lineage UI, and the SQLMesh UI, mounting `./output` so lineage artifacts are available on the host.
-- `scripts/generate_lineage.py` patches SQL with `_row_trace_id`, captures lineage across the two model hops, and writes JSONL/Parquet outputs.
 
 ## SQLMesh UI
 

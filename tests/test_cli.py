@@ -115,3 +115,44 @@ def test_main_succeeds_with_profile(monkeypatch, tmp_path, capsys):
 
     captured = capsys.readouterr()
     assert "Generated 0 lineage mappings" in captured.out
+
+
+def test_main_applies_export_overrides(monkeypatch, tmp_path, capsys):
+    project_root, profiles_dir = _write_project_and_profiles(tmp_path)
+    (project_root / "target").mkdir()
+    monkeypatch.setenv("DBT_PROFILES_DIR", str(profiles_dir))
+
+    class DummyConn:
+        def close(self):
+            pass
+
+    monkeypatch.setattr(cli.psycopg2, "connect", lambda **kwargs: DummyConn())
+
+    captured_kwargs = {}
+
+    def fake_generate_lineage_for_project(**kwargs):
+        captured_kwargs.update(kwargs)
+        return []
+
+    monkeypatch.setattr(cli, "generate_lineage_for_project", fake_generate_lineage_for_project)
+
+    export_path = project_root / "custom" / "lineage.parquet"
+    exit_code = cli.main(
+        [
+            "--project-root",
+            str(project_root),
+            "--export-format",
+            "parquet",
+            "--export-path",
+            str(export_path),
+        ]
+    )
+
+    assert exit_code == 0
+    assert captured_kwargs.get("vars") == {
+        "rowlineage_export_format": "parquet",
+        "rowlineage_export_path": str(export_path),
+    }
+
+    captured = capsys.readouterr()
+    assert "Generated 0 lineage mappings" in captured.out

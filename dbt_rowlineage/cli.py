@@ -43,6 +43,21 @@ def _parse_args(argv: Optional[list[str]] = None) -> argparse.Namespace:
              "rowlineage_export_path or <project-root>/output/lineage.",
     )
 
+    parser.add_argument(
+        "--export-format",
+        type=str,
+        default=None,
+        choices=["jsonl", "parquet"],
+        help="Override rowlineage export format (jsonl or parquet). Defaults to project config.",
+    )
+
+    parser.add_argument(
+        "--export-path",
+        type=str,
+        default=None,
+        help="Override rowlineage export path. Defaults to project config.",
+    )
+
     # DB connection overrides; env vars still work if flags omitted
     parser.add_argument(
         "--db-host",
@@ -193,6 +208,15 @@ def _resolve_paths(args: argparse.Namespace) -> tuple[Path, Optional[Path], Opti
     return project_root, manifest_path, output_dir
 
 
+def _build_vars_overrides(args: argparse.Namespace) -> dict[str, str]:
+    vars_overrides: dict[str, str] = {}
+    if args.export_format:
+        vars_overrides["rowlineage_export_format"] = args.export_format
+    if args.export_path:
+        vars_overrides["rowlineage_export_path"] = args.export_path
+    return vars_overrides
+
+
 def main(argv: Optional[list[str]] = None) -> int:
     args = _parse_args(argv)
 
@@ -203,12 +227,15 @@ def main(argv: Optional[list[str]] = None) -> int:
         print(f"[dbt-rowlineage] ERROR: {e}", file=sys.stderr)
         return 1
 
+    vars_overrides = _build_vars_overrides(args)
+
     try:
         mappings = generate_lineage_for_project(
             conn=conn,
             project_root=project_root,
             manifest_path=manifest_path,
             output_dir=output_dir,
+            vars=vars_overrides if vars_overrides else None,
         )
         print(f"[dbt-rowlineage] Generated {len(mappings)} lineage mappings.")
         return 0
