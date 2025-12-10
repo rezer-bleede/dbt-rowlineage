@@ -8,6 +8,8 @@ import sys
 from pathlib import Path
 from typing import Any, Optional
 
+import yaml
+
 import psycopg2
 from psycopg2 import OperationalError
 
@@ -76,6 +78,57 @@ def _parse_args(argv: Optional[list[str]] = None) -> argparse.Namespace:
     return parser.parse_args(argv)
 
 
+def _load_profile_connection(project_root: Path) -> dict[str, Optional[str]]:
+    """Load connection defaults from the dbt profile, if present.
+
+    The project profile name is read from ``dbt_project.yml`` under ``project_root``.
+    The target is resolved using ``DBT_TARGET`` env var, the profile ``target`` key,
+    or the first defined output. Missing files or malformed YAML are treated as the
+    absence of profile defaults rather than hard failures.
+    """
+
+    project_file = project_root / "dbt_project.yml"
+    try:
+        project_cfg = yaml.safe_load(project_file.read_text(encoding="utf-8")) if project_file.exists() else None
+        profile_name = project_cfg.get("profile") if isinstance(project_cfg, dict) else None
+        if not profile_name:
+            return {}
+
+        profiles_dir = Path(os.getenv("DBT_PROFILES_DIR", Path.home() / ".dbt"))
+        profiles_file = profiles_dir / "profiles.yml"
+        profiles_cfg = (
+            yaml.safe_load(profiles_file.read_text(encoding="utf-8")) if profiles_file.exists() else None
+        )
+        profile_block = profiles_cfg.get(profile_name) if isinstance(profiles_cfg, dict) else None
+        if not profile_block:
+            return {}
+
+        outputs = profile_block.get("outputs") or {}
+        target_name = os.getenv("DBT_TARGET") or profile_block.get("target")
+        if not target_name and outputs:
+            target_name = next(iter(outputs.keys()))
+
+        target_cfg = outputs.get(target_name, {}) if isinstance(outputs, dict) else {}
+
+        host = target_cfg.get("host")
+        port = target_cfg.get("port")
+        database = target_cfg.get("dbname") or target_cfg.get("database")
+        user = target_cfg.get("user")
+        password = target_cfg.get("password") or target_cfg.get("pass") or target_cfg.get("passphrase")
+
+        return {
+            "host": host,
+            "port": str(port) if port is not None else None,
+            "database": database,
+            "user": user,
+            "password": password,
+        }
+    except Exception:
+        # Swallow YAML/IO errors; CLI will fall back to env/flags and raise a
+        # clearer error if required parameters are still missing.
+        return {}
+
+
 def _resolve_db_param(
     cli_value: Optional[str],
     env_keys: list[str],
@@ -90,21 +143,23 @@ def _resolve_db_param(
     return default
 
 
-def _get_connection(args: argparse.Namespace):
-    host = _resolve_db_param(args.db_host, ["DBT_HOST", "PGHOST"], "localhost")
+def _get_connection(args: argparse.Namespace, project_root: Path):
+    profile_defaults = _load_profile_connection(project_root)
+
+    host = _resolve_db_param(args.db_host, ["DBT_HOST", "PGHOST"], profile_defaults.get("host", "localhost"))
     port_str = _resolve_db_param(
         str(args.db_port) if args.db_port is not None else None,
         ["DBT_PORT", "PGPORT"],
-        "5432",
+        profile_defaults.get("port", "5432"),
     )
     try:
         port = int(port_str) if port_str is not None else 5432
     except ValueError:
         raise RuntimeError(f"Invalid DB port value: {port_str!r}")
 
-    database = _resolve_db_param(args.db_name, ["DBT_DATABASE", "PGDATABASE"], None)
-    user = _resolve_db_param(args.db_user, ["DBT_USER", "PGUSER"], None)
-    password = _resolve_db_param(args.db_password, ["DBT_PASSWORD", "PGPASSWORD"], None)
+    database = _resolve_db_param(args.db_name, ["DBT_DATABASE", "PGDATABASE"], profile_defaults.get("database"))
+    user = _resolve_db_param(args.db_user, ["DBT_USER", "PGUSER"], profile_defaults.get("user"))
+    password = _resolve_db_param(args.db_password, ["DBT_PASSWORD", "PGPASSWORD"], profile_defaults.get("password"))
 
     missing: list[str] = []
     if not database:
@@ -143,7 +198,7 @@ def main(argv: Optional[list[str]] = None) -> int:
 
     try:
         project_root, manifest_path, output_dir = _resolve_paths(args)
-        conn = _get_connection(args)
+        conn = _get_connection(args, project_root)
     except Exception as e:
         print(f"[dbt-rowlineage] ERROR: {e}", file=sys.stderr)
         return 1

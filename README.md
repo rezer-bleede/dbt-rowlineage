@@ -12,6 +12,21 @@ pip install dbt-rowlineage
 
 After installation the plugin is discovered automatically by dbt; keep using your existing adapter (for example `postgres`, `bigquery`, or `snowflake`) and enable row lineage with vars and model configs.
 
+### Command line utility
+
+The project ships a `dbt-rowlineage` CLI that can export lineage for a compiled dbt project. Connection parameters are read in this order:
+
+1. CLI flags such as `--db-host`, `--db-user`, and `--db-password`.
+2. Environment variables (`DBT_HOST`, `PGUSER`, `DBT_DATABASE`, etc.).
+3. The dbt profile defined in `dbt_project.yml` and loaded from `profiles.yml` (respecting `DBT_PROFILES_DIR` and `DBT_TARGET`).
+
+A minimal invocation that relies on the project profile looks like:
+
+```bash
+DBT_PROFILES_DIR=/path/to/profiles \
+dbt-rowlineage --project-root /path/to/dbt/project
+```
+
 ## Configuration
 
 Enable the plugin in `dbt_project.yml` by setting vars and model configs:

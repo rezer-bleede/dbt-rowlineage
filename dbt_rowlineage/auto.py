@@ -91,6 +91,7 @@ def generate_lineage_for_project(
     plugin: RowLineagePlugin | None = None,
     manifest_path: Path | None = None,
     output_dir: Path | None = None,
+    vars: dict | None = None,
 ) -> List[MappingRecord]:
     """
     High–level API: given a DB connection + dbt project, compute lineage
@@ -100,7 +101,8 @@ def generate_lineage_for_project(
     """
     plugin = plugin or RowLineagePlugin()
     # Let dbt vars / env override config in real use; for demo we just use defaults.
-    plugin.initialize(vars=None)
+    if vars is not None:
+        plugin.initialize(vars=vars)
 
     project_root = project_root.resolve()
     manifest_path = manifest_path or (project_root / "target" / "manifest.json")
