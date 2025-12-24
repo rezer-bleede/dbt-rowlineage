@@ -6,7 +6,7 @@ rowlineage_demo:
       host: postgres
       user: demo
       password: demo
-      port: 5432
+      port: 5433
       dbname: demo
       schema: public
       threads: 4

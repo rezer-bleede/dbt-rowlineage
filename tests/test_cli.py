@@ -32,6 +32,44 @@ demo_profile:
     return project_root, profiles_dir
 
 
+def test_get_connection_defaults_to_new_port(monkeypatch, tmp_path):
+    project_root = tmp_path
+    (project_root / "dbt_project.yml").write_text("profile: demo\n")
+
+    monkeypatch.delenv("DBT_PORT", raising=False)
+    monkeypatch.delenv("PGPORT", raising=False)
+    monkeypatch.setenv("DBT_DATABASE", "demo_db")
+    monkeypatch.setenv("DBT_USER", "demo_user")
+    monkeypatch.setenv("DBT_PASSWORD", "secret")
+
+    captured = {}
+
+    class DummyConn:
+        def close(self):
+            pass
+
+    def fake_connect(**kwargs):
+        captured.update(kwargs)
+        return DummyConn()
+
+    monkeypatch.setattr(cli.psycopg2, "connect", fake_connect)
+
+    args = argparse.Namespace(
+        db_host=None,
+        db_port=None,
+        db_name=None,
+        db_user=None,
+        db_password=None,
+        project_root=str(project_root),
+        manifest_path=None,
+        output_dir=None,
+    )
+
+    conn = cli._get_connection(args, project_root)
+    assert isinstance(conn, DummyConn)
+    assert captured.get("port") == 5433
+
+
 def test_load_profile_connection(tmp_path, monkeypatch):
     project_root, profiles_dir = _write_project_and_profiles(tmp_path)
     monkeypatch.setenv("DBT_PROFILES_DIR", str(profiles_dir))

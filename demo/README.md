@@ -17,6 +17,8 @@ docker-compose up --build
 The command builds a Python image that installs `dbt-postgres` and the published `dbt-rowlineage` package, waits for Postgres to become healthy, installs dbt packages, seeds the example data, runs the dbt project, and then calls the `dbt-rowlineage` CLI to export lineage.
 It also starts a small UI service that can render mart rows and their upstream lineage.
 
+Postgres now listens on port `5433` inside the Compose network and on your host to avoid conflicts with any local Postgres instance already bound to `5432`. Update the `DBT_PORT` or `SQLMESH_PG_PORT` environment variables if you need to run the stack on a different port.
+
 The bundled `dbt-rowlineage` CLI reads credentials from the demo's `profiles.yml`, so you don't need to manually export `DBT_DATABASE` or `DBT_USER` when the stack starts.
 Override the output format or path by passing flags such as `--export-format parquet` or `--export-path /demo/output/lineage/lineage.parquet` to the CLI invocation.
 
