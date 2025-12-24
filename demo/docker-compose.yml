@@ -3,15 +3,15 @@ version: "3.9"
 services:
   postgres:
     image: postgres:15-alpine
-    command: -p 5433
+    command: -p 6543
     environment:
       POSTGRES_DB: demo
       POSTGRES_USER: demo
       POSTGRES_PASSWORD: demo
     ports:
-      - "5433:5433"
+      - "6543:6543"
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U demo -p 5433"]
+      test: ["CMD-SHELL", "pg_isready -U demo -p 6543"]
       interval: 5s
       timeout: 5s
       retries: 10
@@ -51,7 +51,7 @@ services:
       SQLMESH_PG_USER: demo
       SQLMESH_PG_PASSWORD: demo
       SQLMESH_PG_DB: demo
-      SQLMESH_PG_PORT: 5433
+      SQLMESH_PG_PORT: 6543
     ports:
       - "8000:8000"
     volumes:
@@ -70,7 +70,7 @@ services:
       DBT_USER: demo
       DBT_PASSWORD: demo
       DBT_HOST: postgres
-      DBT_PORT: 5433
+      DBT_PORT: 6543
     ports:
       - "8080:8080"
     volumes:

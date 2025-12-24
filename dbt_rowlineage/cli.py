@@ -69,7 +69,7 @@ def _parse_args(argv: Optional[list[str]] = None) -> argparse.Namespace:
         "--db-port",
         type=int,
         default=None,
-        help="Database port (default: DBT_PORT or 5433).",
+        help="Database port (default: DBT_PORT or 6543).",
     )
     parser.add_argument(
         "--db-name",
@@ -165,10 +165,10 @@ def _get_connection(args: argparse.Namespace, project_root: Path):
     port_str = _resolve_db_param(
         str(args.db_port) if args.db_port is not None else None,
         ["DBT_PORT", "PGPORT"],
-        profile_defaults.get("port", "5433"),
+        profile_defaults.get("port", "6543"),
     )
     try:
-        port = int(port_str) if port_str is not None else 5433
+        port = int(port_str) if port_str is not None else 6543
     except ValueError:
         raise RuntimeError(f"Invalid DB port value: {port_str!r}")
 

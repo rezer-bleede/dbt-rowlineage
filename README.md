@@ -20,7 +20,7 @@ The project ships a `dbt-rowlineage` CLI that can export lineage for a compiled 
 2. Environment variables (`DBT_HOST`, `PGUSER`, `DBT_DATABASE`, etc.).
 3. The dbt profile defined in `dbt_project.yml` and loaded from `profiles.yml` (respecting `DBT_PROFILES_DIR` and `DBT_TARGET`).
 
-When no port override is provided, the CLI defaults to `DBT_PORT`/`PGPORT` and falls back to `5433` to avoid clashing with other Postgres containers that may already be bound to `5432`.
+When no port override is provided, the CLI defaults to `DBT_PORT`/`PGPORT` and falls back to `6543` to avoid clashing with other Postgres containers that may already be bound to `5432` or `5433`.
 
 A minimal invocation that relies on the project profile looks like:
 
