@@ -181,10 +181,24 @@ class ManifestIndex:
             str(node.get("original_file_path", "")),
         ]
 
-    def _is_mart_path(self, path: str) -> bool:
-        normalized = path.lstrip("./")
-        if normalized.startswith("models/"):
+    def _normalize_path(self, path: str) -> str:
+        """Normalize manifest paths for reliable mart detection.
+
+        Manifest paths can vary depending on the operating system and dbt
+        configuration. Windows builds, for example, emit backslashes while
+        some projects omit the leading ``models/`` prefix entirely. We convert
+        backslashes to forward slashes and strip optional ``./`` and
+        ``models/`` prefixes so downstream checks can rely on a consistent
+        shape.
+        """
+
+        normalized = path.replace("\\", "/").lstrip("./")
+        while normalized.startswith("models/"):
             normalized = normalized[len("models/") :]
+        return normalized
+
+    def _is_mart_path(self, path: str) -> bool:
+        normalized = self._normalize_path(path)
         return normalized.startswith("marts/") or "/marts/" in normalized
 
     def mart_models(self) -> List[Dict]:
