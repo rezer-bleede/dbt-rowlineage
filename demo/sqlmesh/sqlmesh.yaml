@@ -9,6 +9,6 @@ gateways:
       user: ${SQLMESH_PG_USER:-demo}
       password: ${SQLMESH_PG_PASSWORD:-demo}
       database: ${SQLMESH_PG_DB:-demo}
-      port: ${SQLMESH_PG_PORT:-5433}
+      port: ${SQLMESH_PG_PORT:-6543}
 
 default_gateway: demo

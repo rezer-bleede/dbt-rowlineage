@@ -67,7 +67,7 @@ def test_get_connection_defaults_to_new_port(monkeypatch, tmp_path):
 
     conn = cli._get_connection(args, project_root)
     assert isinstance(conn, DummyConn)
-    assert captured.get("port") == 5433
+    assert captured.get("port") == 6543
 
 
 def test_load_profile_connection(tmp_path, monkeypatch):
