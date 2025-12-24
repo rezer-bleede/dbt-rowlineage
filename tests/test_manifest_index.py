@@ -1,44 +1,78 @@
-import json
-from pathlib import Path
+import sys
+from typing import Dict, List
 
-from demo.ui.app import ManifestIndex
+from dbt_rowlineage.utils.sql import TRACE_COLUMN
+
+ROOT = __import__("pathlib").Path(__file__).resolve().parent.parent
+if str(ROOT) not in sys.path:
+    sys.path.insert(0, str(ROOT))
+
+from demo.ui.app import LineageRepository, ManifestIndex  # noqa: E402
 
 
-def test_manifest_index_reads_mart_models(tmp_path: Path):
-    manifest = {
-        "nodes": {
-            "model.rowlineage_demo.mart_model": {
-                "name": "mart_model",
-                "resource_type": "model",
-                "path": "models/marts/mart_model.sql",
-                "schema": "public_marts",
-                "alias": "mart_model",
-                "columns": {"id": {}, "region": {}},
-            },
-            "model.rowlineage_demo.region_rollup": {
-                "name": "region_rollup",
-                "resource_type": "model",
-                "path": "models/marts/region_rollup.sql",
-                "schema": "public_marts",
-                "alias": "region_rollup",
-                "columns": {"region": {}, "customer_count": {}},
-            },
-            "model.rowlineage_demo.staging_model": {
-                "name": "staging_model",
-                "resource_type": "model",
-                "path": "models/staging/staging_model.sql",
-                "schema": "public_staging",
-                "alias": "staging_model",
-            },
-        }
+MANIFEST_FIXTURE: Dict[str, Dict] = {
+    "nodes": {
+        "model.demo.mart_model": {
+            "name": "mart_model",
+            "resource_type": "model",
+            "schema": "analytics",
+            "alias": "mart_model",
+            "path": "marts/mart_model.sql",
+            "original_file_path": "models/marts/mart_model.sql",
+            "columns": {"id": {}, "region": {}},
+        },
+        "model.demo.region_rollup": {
+            "name": "region_rollup",
+            "resource_type": "model",
+            "schema": "analytics",
+            "alias": "region_rollup",
+            "path": "marts/region_rollup.sql",
+            "original_file_path": "models/marts/region_rollup.sql",
+            "columns": {"region": {}, "customer_count": {}},
+        },
+        "model.demo.staging_model": {
+            "name": "staging_model",
+            "resource_type": "model",
+            "schema": "analytics",
+            "alias": "staging_model",
+            "path": "staging/staging_model.sql",
+            "original_file_path": "models/staging/staging_model.sql",
+            "columns": {"id": {}, "region": {}},
+        },
     }
+}
 
-    manifest_path = tmp_path / "manifest.json"
-    manifest_path.write_text(json.dumps(manifest))
 
-    index = ManifestIndex(manifest_path)
+class StubRepository(LineageRepository):
+    def __init__(self):
+        super().__init__(manifest_index=ManifestIndex(manifest_data=MANIFEST_FIXTURE))
 
-    marts = index.mart_models()
-    assert {node["name"] for node in marts} == {"mart_model", "region_rollup"}
-    assert index.resolve_relation("region_rollup") == ("public_marts", "region_rollup")
-    assert set(index.columns_for_model("region_rollup")) == {"region", "customer_count"}
+    def _fetch_rows(self, sql: str, params: List | None = None) -> List[dict]:  # type: ignore[override]
+        if "region_rollup" in sql:
+            return [
+                {"region": "west", "customer_count": 2, TRACE_COLUMN: "agg-west"},
+                {"region": "east", "customer_count": 1, TRACE_COLUMN: "agg-east"},
+            ]
+        return [
+            {"id": 1, "region": "west", TRACE_COLUMN: "mart-1"},
+            {"id": 2, "region": "east", TRACE_COLUMN: "mart-2"},
+        ]
+
+
+def test_manifest_index_detects_marts_without_models_prefix():
+    index = ManifestIndex(manifest_data=MANIFEST_FIXTURE)
+    mart_names = {node["name"] for node in index.mart_models()}
+
+    assert mart_names == {"mart_model", "region_rollup"}
+
+
+def test_fetch_mart_rows_uses_manifest_marts():
+    repo = StubRepository()
+
+    models = repo.fetch_mart_rows()
+    model_lookup = {model["name"]: model for model in models}
+
+    assert set(model_lookup.keys()) == {"mart_model", "region_rollup"}
+    assert model_lookup["mart_model"]["rows"][0][TRACE_COLUMN] == "mart-1"
+    assert model_lookup["region_rollup"]["rows"][0]["customer_count"] == 2
+    assert TRACE_COLUMN in model_lookup["region_rollup"]["columns"]
