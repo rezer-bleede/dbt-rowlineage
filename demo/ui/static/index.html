@@ -24,22 +24,20 @@
   </head>
   <body>
     <h1>Row Level Lineage Explorer</h1>
-    <p class="muted">Inspect mart records and trace each row back through staging to its source record.</p>
+    <p class="muted">Inspect mart records, including aggregations, and trace each row back through staging to its source record.</p>
     <div class="card">
       <div style="display: flex; justify-content: space-between; align-items: center;">
         <h2>Mart rows</h2>
-        <button id="refresh">Refresh</button>
+        <div>
+          <label for="model-select" class="muted">Model</label>
+          <select id="model-select"></select>
+          <button id="refresh">Refresh</button>
+        </div>
       </div>
       <div id="status" class="muted">Loading mart rows…</div>
       <table id="mart-table" aria-label="Mart rows">
         <thead>
-          <tr>
-            <th>ID</th>
-            <th>Customer</th>
-            <th>Region</th>
-            <th>Customer Key</th>
-            <th>Trace ID</th>
-          </tr>
+          <tr></tr>
         </thead>
         <tbody></tbody>
       </table>
@@ -58,6 +56,56 @@
       const hops = document.querySelector('#hops');
       const target = document.querySelector('#target');
       const refreshButton = document.querySelector('#refresh');
+      const modelSelect = document.querySelector('#model-select');
+      const headerRow = document.querySelector('#mart-table thead tr');
+
+      let martModels = [];
+
+      function formatValue(value) {
+        if (Array.isArray(value)) {
+          return value.join(', ');
+        }
+        if (value === null || value === undefined) {
+          return 'n/a';
+        }
+        return value;
+      }
+
+      function renderModelOptions() {
+        modelSelect.innerHTML = '';
+        martModels.forEach((model, idx) => {
+          const option = document.createElement('option');
+          option.value = model.name;
+          option.textContent = model.name;
+          if (idx === 0) option.selected = true;
+          modelSelect.appendChild(option);
+        });
+      }
+
+      function renderTableForModel(modelName) {
+        const model = martModels.find(m => m.name === modelName);
+        martTable.innerHTML = '';
+        headerRow.innerHTML = '';
+
+        if (!model) {
+          status.textContent = 'No mart models available.';
+          return;
+        }
+
+        const rows = model.rows || [];
+        const columns = Array.from(new Set([...(model.columns || []), ...(rows[0] ? Object.keys(rows[0]) : [])]));
+
+        headerRow.innerHTML = columns.map(col => `<th>${col}</th>`).join('');
+
+        rows.forEach(row => {
+          const tr = document.createElement('tr');
+          tr.innerHTML = columns.map(col => `<td>${formatValue(row[col])}</td>`).join('');
+          tr.addEventListener('click', () => loadLineage(model.name, row._row_trace_id));
+          martTable.appendChild(tr);
+        });
+
+        status.textContent = `Loaded ${rows.length} rows from ${model.name}.`;
+      }
 
       async function loadMartRows() {
         status.textContent = 'Loading mart rows…';
@@ -68,32 +116,27 @@
           return;
         }
         const data = await res.json();
-        status.textContent = `Loaded ${data.rows.length} mart rows.`;
-        data.rows.forEach(row => {
-          const tr = document.createElement('tr');
-          tr.innerHTML = `
-            <td>${row.id}</td>
-            <td>${row.customer_name_upper ?? row.customer_name}</td>
-            <td>${row.region}</td>
-            <td>${row.customer_key || ''}</td>
-            <td><code>${row._row_trace_id}</code></td>
-          `;
-          tr.addEventListener('click', () => loadLineage(row._row_trace_id));
-          martTable.appendChild(tr);
-        });
+        martModels = data.models || [];
+        renderModelOptions();
+        const initialModel = modelSelect.value || (martModels[0] && martModels[0].name);
+        if (initialModel) {
+          renderTableForModel(initialModel);
+        } else {
+          status.textContent = 'No mart rows found.';
+        }
       }
 
-      async function loadLineage(traceId) {
+      async function loadLineage(modelName, traceId) {
         hops.innerHTML = '';
         lineageCard.style.display = 'block';
         target.textContent = 'Loading lineage…';
-        const res = await fetch(`/api/lineage/${traceId}`);
+        const res = await fetch(`/api/lineage/${modelName}/${traceId}`);
         if (!res.ok) {
           target.textContent = 'Lineage unavailable for this record.';
           return;
         }
         const data = await res.json();
-        target.innerHTML = `<strong>Selected trace:</strong> <code>${traceId}</code>`;
+        target.innerHTML = `<strong>Selected trace (${modelName}):</strong> <code>${traceId}</code>`;
         data.hops.forEach(hop => {
           const div = document.createElement('div');
           div.className = 'hop';
@@ -104,9 +147,7 @@
             <div class="muted">Target trace: <code>${hop.target_trace_id}</code></div>
             <div style="margin-top: 8px;">
               <div><strong>Row values</strong></div>
-              <div>ID: ${row.id ?? 'n/a'}</div>
-              <div>Name: ${row.customer_name_upper ?? row.customer_name ?? 'n/a'}</div>
-              <div>Region: ${row.region ?? 'n/a'}</div>
+              ${Object.entries(row).map(([k, v]) => `<div>${k}: ${formatValue(v)}</div>`).join('')}
             </div>
             <div style="margin-top: 8px;" class="muted">Compiled SQL: ${hop.compiled_sql || 'N/A'}</div>
             <div class="muted">Executed at: ${hop.executed_at || 'N/A'}</div>
@@ -115,6 +156,9 @@
         });
       }
 
+      modelSelect.addEventListener('change', event => {
+        renderTableForModel(event.target.value);
+      });
       refreshButton.addEventListener('click', loadMartRows);
       loadMartRows();
     </script>

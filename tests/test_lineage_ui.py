@@ -52,20 +52,29 @@ def test_fastapi_endpoints_with_stubbed_repository(tmp_path: Path):
     class StubRepository:
         def fetch_mart_rows(self):
             return [
-                {"id": 1, "region": "west", "customer_name_upper": "ALICE", "_row_trace_id": "mart-1"}
+                {
+                    "name": "mart_model",
+                    "columns": ["id", "customer_name_upper", "region", "_row_trace_id"],
+                    "rows": [
+                        {"id": 1, "region": "west", "customer_name_upper": "ALICE", "_row_trace_id": "mart-1"}
+                    ],
+                }
             ]
 
-        def fetch_lineage(self, trace_id: str):
+        def fetch_lineage(self, model: str, trace_id: str):
             assert trace_id == "mart-1"
-            return {"target_row": self.fetch_mart_rows()[0], "hops": []}
+            assert model == "mart_model"
+            return {"target_row": self.fetch_mart_rows()[0]["rows"][0], "hops": [], "target_model": model}
 
     app = create_app(repository_provider=lambda: StubRepository())
     client = TestClient(app)
 
     mart_response = client.get("/api/mart_rows")
     assert mart_response.status_code == 200
-    assert mart_response.json()["rows"][0]["_row_trace_id"] == "mart-1"
+    models = mart_response.json()["models"]
+    assert models[0]["name"] == "mart_model"
+    assert models[0]["rows"][0]["_row_trace_id"] == "mart-1"
 
-    lineage_response = client.get("/api/lineage/mart-1")
+    lineage_response = client.get("/api/lineage/mart_model/mart-1")
     assert lineage_response.status_code == 200
     assert lineage_response.json()["target_row"]["id"] == 1

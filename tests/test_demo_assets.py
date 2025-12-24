@@ -81,3 +81,9 @@ def test_demo_uses_nondefault_postgres_port():
 
     sqlmesh = Path("demo/sqlmesh/sqlmesh.yaml").read_text()
     assert "${SQLMESH_PG_PORT:-6543}" in sqlmesh
+
+
+def test_demo_includes_aggregation_model():
+    mart_model = Path("demo/models/marts/region_rollup.sql").read_text()
+    assert "group by region" in mart_model.lower()
+    assert "array_agg" in mart_model.lower()

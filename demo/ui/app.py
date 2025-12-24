@@ -4,7 +4,7 @@ import json
 import os
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Callable, Dict, Iterable, List, Optional
+from typing import Callable, Dict, Iterable, List, Optional, Tuple
 
 import psycopg2
 from fastapi import Depends, FastAPI, HTTPException
@@ -13,13 +13,6 @@ from fastapi.staticfiles import StaticFiles
 
 from dbt_rowlineage.utils.sql import TRACE_COLUMN
 from dbt_rowlineage.utils.uuid import new_trace_id
-
-
-MODEL_TABLES: Dict[str, tuple[str, str]] = {
-    "mart_model": ("public_marts", "mart_model"),
-    "staging_model": ("public_staging", "staging_model"),
-    "example_source": ("public_staging", "example_source"),
-}
 
 
 @dataclass
@@ -44,13 +37,19 @@ class Mapping:
 
 
 class LineageRepository:
-    def __init__(self, lineage_path: Path | None = None):
+    def __init__(
+        self,
+        lineage_path: Path | None = None,
+        manifest_path: Path | None = None,
+        manifest_index: "ManifestIndex | None" = None,
+    ):
         self.lineage_path = lineage_path or Path("/demo/output/lineage/lineage.jsonl")
         self.dbname = os.getenv("DBT_DATABASE", "demo")
         self.user = os.getenv("DBT_USER", "demo")
         self.password = os.getenv("DBT_PASSWORD", "demo")
         self.host = os.getenv("DBT_HOST", "postgres")
         self.port = int(os.getenv("DBT_PORT", "6543"))
+        self.manifest = manifest_index or ManifestIndex(manifest_path)
 
     def _connect(self):
         return psycopg2.connect(
@@ -74,10 +73,10 @@ class LineageRepository:
         return rows
 
     def _fetch_row_by_trace(self, model: str, trace_id: str) -> Optional[dict]:
-        schema_table = MODEL_TABLES.get(model)
-        if not schema_table:
+        relation = self.manifest.resolve_relation(model)
+        if relation is None:
             return None
-        schema, table = schema_table
+        schema, table = relation
         
         # First check if the table has the trace column
         with self._connect() as conn:
@@ -90,14 +89,14 @@ class LineageRepository:
             # Table has trace column, query by trace ID
             sql = (
                 f"select * from {schema}.{table} where {TRACE_COLUMN} = %s "
-                "order by id limit 1"
+                "order by 1 limit 1"
             )
             rows = self._fetch_rows(sql, (trace_id,))
             return rows[0] if rows else None
         else:
             # Table doesn't have trace column (e.g., seed tables)
             # Fetch all rows and generate trace IDs, then find the matching one
-            sql = f"select * from {schema}.{table} order by id"
+            sql = f"select * from {schema}.{table} order by 1"
             rows = self._fetch_rows(sql)
             # Find the row that would have this trace ID
             for row in rows:
@@ -112,24 +111,87 @@ class LineageRepository:
             return [Mapping.from_json(json.loads(line)) for line in handle if line.strip()]
 
     def fetch_mart_rows(self) -> List[dict]:
-        schema, table = MODEL_TABLES["mart_model"]
-        sql = f"select * from {schema}.{table} order by id"
-        return self._fetch_rows(sql)
+        models = []
+        mart_models = self.manifest.mart_models()
 
-    def fetch_lineage(self, target_trace_id: str) -> dict:
-        mart_rows = self.fetch_mart_rows()
-        target_row = next((row for row in mart_rows if row.get(TRACE_COLUMN) == target_trace_id), None)
+        for node in mart_models:
+            relation = self.manifest.resolve_relation(node.get("name", ""))
+            if relation is None:
+                continue
+            schema, table = relation
+            sql = f"select * from {schema}.{table} order by 1"
+            rows = self._fetch_rows(sql)
+            columns = self.manifest.columns_for_model(node.get("name", ""))
+            if not columns and rows:
+                columns = list(rows[0].keys())
+            if TRACE_COLUMN not in columns:
+                columns.append(TRACE_COLUMN)
+            models.append({"name": node.get("name"), "columns": columns, "rows": rows})
+
+        return models
+
+    def fetch_lineage(self, target_model: str, target_trace_id: str) -> dict:
+        relation = self.manifest.resolve_relation(target_model)
+        if relation is None:
+            raise HTTPException(status_code=404, detail="Unknown model")
+
+        target_rows = self._fetch_rows(
+            f"select * from {relation[0]}.{relation[1]} order by 1"
+        )
+        target_row = next((row for row in target_rows if row.get(TRACE_COLUMN) == target_trace_id), None)
         if not target_row:
             raise HTTPException(status_code=404, detail="Mart record not found")
 
         mappings = self._load_mappings()
         hops = build_lineage_graph(
             target_trace_id=target_trace_id,
-            target_model="mart_model",
+            target_model=target_model,
             mappings=mappings,
             row_lookup=lambda model, trace: self._fetch_row_by_trace(model, trace),
         )
-        return {"target_row": target_row, "hops": hops}
+        return {"target_row": target_row, "hops": hops, "target_model": target_model}
+
+
+class ManifestIndex:
+    def __init__(self, manifest_path: Path | None = None):
+        self.manifest_path = manifest_path or Path("/demo/target/manifest.json")
+        self._manifest = self._load_manifest()
+
+    def _load_manifest(self) -> Dict:
+        if not self.manifest_path.exists():
+            return {"nodes": {}}
+        with self.manifest_path.open("r", encoding="utf-8") as fp:
+            return json.load(fp)
+
+    def _iter_nodes(self) -> Iterable[Dict]:
+        return self._manifest.get("nodes", {}).values()
+
+    def resolve_relation(self, model: str) -> Optional[Tuple[str, str]]:
+        for node in self._iter_nodes():
+            if node.get("name") == model and node.get("resource_type") in {"model", "seed", "snapshot"}:
+                schema = node.get("schema")
+                table = node.get("alias") or node.get("name")
+                if schema and table:
+                    return schema, table
+        return None
+
+    def mart_models(self) -> List[Dict]:
+        mart_nodes = [
+            node
+            for node in self._iter_nodes()
+            if node.get("resource_type") == "model" and str(node.get("path", "")).startswith("models/marts")
+        ]
+        if mart_nodes:
+            return mart_nodes
+        # Fallback for minimal environments without manifest metadata
+        return [node for node in self._iter_nodes() if node.get("name") == "mart_model"]
+
+    def columns_for_model(self, model: str) -> List[str]:
+        for node in self._iter_nodes():
+            if node.get("name") == model:
+                columns = node.get("columns") or {}
+                return list(columns.keys())
+        return []
 
 
 def build_lineage_graph(
@@ -185,11 +247,11 @@ def create_app(repository_provider: Optional[Callable[[], LineageRepository]] = 
 
     @app.get("/api/mart_rows")
     def mart_rows(repo: LineageRepository = Depends(repo_dependency)) -> dict:
-        return {"rows": repo.fetch_mart_rows()}
+        return {"models": repo.fetch_mart_rows()}
 
-    @app.get("/api/lineage/{trace_id}")
-    def lineage(trace_id: str, repo: LineageRepository = Depends(repo_dependency)) -> dict:
-        return repo.fetch_lineage(trace_id)
+    @app.get("/api/lineage/{model}/{trace_id}")
+    def lineage(model: str, trace_id: str, repo: LineageRepository = Depends(repo_dependency)) -> dict:
+        return repo.fetch_lineage(model, trace_id)
 
     return app
 
