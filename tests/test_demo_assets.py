@@ -68,3 +68,16 @@ def test_gitignore_excludes_dbt_artifacts():
     assert "demo/target/" in gitignore
     assert "target/" in gitignore
     assert "dbt_packages/" in gitignore
+
+
+def test_demo_uses_nondefault_postgres_port():
+    compose = Path("demo/docker-compose.yml").read_text()
+    assert "5433:5433" in compose
+    assert "SQLMESH_PG_PORT: 5433" in compose
+    assert "DBT_PORT: 5433" in compose
+
+    profile = Path("demo/profiles.yml").read_text()
+    assert "port: 5433" in profile
+
+    sqlmesh = Path("demo/sqlmesh/sqlmesh.yaml").read_text()
+    assert "${SQLMESH_PG_PORT:-5433}" in sqlmesh

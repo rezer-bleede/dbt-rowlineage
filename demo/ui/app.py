@@ -50,7 +50,7 @@ class LineageRepository:
         self.user = os.getenv("DBT_USER", "demo")
         self.password = os.getenv("DBT_PASSWORD", "demo")
         self.host = os.getenv("DBT_HOST", "postgres")
-        self.port = int(os.getenv("DBT_PORT", "5432"))
+        self.port = int(os.getenv("DBT_PORT", "5433"))
 
     def _connect(self):
         return psycopg2.connect(
