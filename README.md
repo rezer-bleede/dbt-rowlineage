@@ -86,7 +86,7 @@ docker-compose up --build
 ```
 
 Lineage artifacts are written to `demo/output/lineage/` by the `dbt-rowlineage` CLI rather than a helper script. The Compose entrypoint now installs packages and seeds the demo data before the first `dbt run`, preventing missing table errors for `example_source`. After the stack comes up, visit http://localhost:8080 to browse mart rows—including the aggregated `region_rollup` mart—and trace them back to staging and source records. See `demo/README.md` for full instructions and an example JSONL record.
-When your dbt project keeps marts under a folder such as `marts/` (without the `models/` prefix baked into the manifest `path`), the lineage UI still discovers them so the dropdown stays populated instead of reporting that no mart rows were found.
+When your dbt project keeps marts under a folder such as `marts/` (without the `models/` prefix baked into the manifest `path`), the lineage UI still discovers them so the dropdown stays populated instead of reporting that no mart rows were found. On Windows, manifest entries can include backslashes instead of forward slashes; those paths are normalized before filtering so marts are still listed.
 
 > Tip: dbt-generated artifacts such as `target/`, `dbt_packages/`, and `logs/` are ignored via `.gitignore` to keep compiled files out of the repository.
 
