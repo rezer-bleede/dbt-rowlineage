@@ -153,9 +153,9 @@ class LineageRepository:
 
 
 class ManifestIndex:
-    def __init__(self, manifest_path: Path | None = None):
+    def __init__(self, manifest_path: Path | None = None, manifest_data: Dict | None = None):
         self.manifest_path = manifest_path or Path("/demo/target/manifest.json")
-        self._manifest = self._load_manifest()
+        self._manifest = manifest_data or self._load_manifest()
 
     def _load_manifest(self) -> Dict:
         if not self.manifest_path.exists():
@@ -175,11 +175,24 @@ class ManifestIndex:
                     return schema, table
         return None
 
+    def _path_candidates(self, node: Dict) -> List[str]:
+        return [
+            str(node.get("path", "")),
+            str(node.get("original_file_path", "")),
+        ]
+
+    def _is_mart_path(self, path: str) -> bool:
+        normalized = path.lstrip("./")
+        if normalized.startswith("models/"):
+            normalized = normalized[len("models/") :]
+        return normalized.startswith("marts/") or "/marts/" in normalized
+
     def mart_models(self) -> List[Dict]:
         mart_nodes = [
             node
             for node in self._iter_nodes()
-            if node.get("resource_type") == "model" and str(node.get("path", "")).startswith("models/marts")
+            if node.get("resource_type") == "model"
+            and any(self._is_mart_path(path) for path in self._path_candidates(node))
         ]
         if mart_nodes:
             return mart_nodes
