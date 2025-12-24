@@ -20,6 +20,12 @@
       button:hover { background: #1c3a73; }
       #status { margin-top: 8px; }
       code { background: #f3f3f3; padding: 2px 4px; border-radius: 4px; }
+      #graph-container { background: #0d1524; border-radius: 8px; min-height: 360px; margin-top: 12px; position: relative; overflow: hidden; }
+      #lineage-graph { width: 100%; height: 420px; }
+      #graph-empty { position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); color: #d7d9de; text-align: center; }
+      .legend { display: flex; align-items: center; gap: 10px; color: #203040; margin-top: 4px; flex-wrap: wrap; }
+      .legend-item { display: inline-flex; align-items: center; gap: 6px; }
+      .legend-swatch { width: 14px; height: 14px; border-radius: 50%; display: inline-block; }
     </style>
   </head>
   <body>
@@ -46,9 +52,24 @@
     <div id="lineage" class="card" style="display: none;">
       <h2>Lineage</h2>
       <div id="target"></div>
+      <div id="graph-wrapper">
+        <div style="display: flex; justify-content: space-between; align-items: center;">
+          <div class="muted">Graph view</div>
+          <div class="legend" aria-label="Graph legend">
+            <div class="legend-item"><span class="legend-swatch" style="background: #6ba4ff;"></span><span>Mart row</span></div>
+            <div class="legend-item"><span class="legend-swatch" style="background: #f8c572;"></span><span>Intermediate</span></div>
+            <div class="legend-item"><span class="legend-swatch" style="background: #d3757d;"></span><span>Source</span></div>
+          </div>
+        </div>
+        <div id="graph-container">
+          <svg id="lineage-graph" role="img" aria-label="Lineage graph"></svg>
+          <div id="graph-empty">Graph will appear after selecting a row.</div>
+        </div>
+      </div>
       <div class="hops" id="hops"></div>
     </div>
 
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/d3/7.9.0/d3.min.js" integrity="sha512-0WYVT7r9p6hMXlMyrq9Gq6dZdRj2O2TaVg03h9oYoYjTaXtfSM69/xtbIo5rMaVf5wHjnjx/OcYtP5Qq0nQ4Jg==" crossorigin="anonymous" referrerpolicy="no-referrer"></script>
     <script>
       const martTable = document.querySelector('#mart-table tbody');
       const status = document.querySelector('#status');
@@ -58,6 +79,8 @@
       const refreshButton = document.querySelector('#refresh');
       const modelSelect = document.querySelector('#model-select');
       const headerRow = document.querySelector('#mart-table thead tr');
+      const graphContainer = document.querySelector('#graph-container');
+      const graphEmpty = document.querySelector('#graph-empty');
 
       let martModels = [];
 
@@ -137,6 +160,8 @@
         }
         const data = await res.json();
         target.innerHTML = `<strong>Selected trace (${modelName}):</strong> <code>${traceId}</code>`;
+        const graphPayload = data.graph || buildGraphFromHops(modelName, traceId, data.hops || []);
+        renderGraph(graphPayload);
         data.hops.forEach(hop => {
           const div = document.createElement('div');
           div.className = 'hop';
@@ -154,6 +179,124 @@
           `;
           hops.appendChild(div);
         });
+      }
+
+      function buildGraphFromHops(modelName, traceId, hopData) {
+        const nodes = {};
+        const edges = [];
+
+        const ensureNode = (model, trace, kind) => {
+          const key = `${model}:${trace}`;
+          if (!nodes[key]) {
+            nodes[key] = { id: key, label: model, trace_id: trace, kind };
+          }
+          return nodes[key];
+        };
+
+        ensureNode(modelName, traceId, 'target');
+
+        hopData.forEach(hop => {
+          const sourceNode = ensureNode(hop.source_model, hop.source_trace_id, 'source');
+          const targetNode = ensureNode(hop.target_model, hop.target_trace_id, 'intermediate');
+          edges.push({ source: sourceNode.id, target: targetNode.id, label: hop.compiled_sql || '' });
+        });
+
+        return { nodes: Object.values(nodes), edges };
+      }
+
+      function nodeColor(kind) {
+        if (kind === 'target') return '#6ba4ff';
+        if (kind === 'intermediate') return '#f8c572';
+        return '#d3757d';
+      }
+
+      function renderGraph(graph) {
+        const svg = d3.select('#lineage-graph');
+        svg.selectAll('*').remove();
+
+        if (!graph || !graph.nodes || graph.nodes.length === 0 || !window.d3) {
+          graphEmpty.textContent = 'No graph data available for this row yet.';
+          graphEmpty.style.display = 'block';
+          svg.attr('height', 0);
+          return;
+        }
+
+        graphEmpty.style.display = 'none';
+
+        const width = graphContainer.clientWidth || 640;
+        const height = 420;
+        svg.attr('width', width).attr('height', height);
+
+        const link = svg
+          .append('g')
+          .attr('stroke', '#6c7aa2')
+          .attr('stroke-opacity', 0.7)
+          .selectAll('line')
+          .data(graph.edges)
+          .enter()
+          .append('line')
+          .attr('stroke-width', 1.5);
+
+        const nodeGroup = svg
+          .append('g')
+          .selectAll('g')
+          .data(graph.nodes)
+          .enter()
+          .append('g')
+          .call(
+            d3.drag()
+              .on('start', dragstarted)
+              .on('drag', dragged)
+              .on('end', dragended)
+          );
+
+        nodeGroup
+          .append('circle')
+          .attr('r', 18)
+          .attr('fill', d => nodeColor(d.kind))
+          .attr('stroke', '#ffffff')
+          .attr('stroke-width', 1.5);
+
+        nodeGroup
+          .append('text')
+          .text(d => d.label)
+          .attr('x', 22)
+          .attr('dy', '0.35em')
+          .attr('fill', '#f1f5ff')
+          .attr('font-size', '12px');
+
+        const simulation = d3
+          .forceSimulation(graph.nodes)
+          .force('link', d3.forceLink(graph.edges).id(d => d.id).distance(130))
+          .force('charge', d3.forceManyBody().strength(-260))
+          .force('center', d3.forceCenter(width / 2, height / 2));
+
+        simulation.on('tick', () => {
+          link
+            .attr('x1', d => d.source.x)
+            .attr('y1', d => d.source.y)
+            .attr('x2', d => d.target.x)
+            .attr('y2', d => d.target.y);
+
+          nodeGroup.attr('transform', d => `translate(${d.x}, ${d.y})`);
+        });
+
+        function dragstarted(event) {
+          if (!event.active) simulation.alphaTarget(0.2).restart();
+          event.subject.fx = event.subject.x;
+          event.subject.fy = event.subject.y;
+        }
+
+        function dragged(event) {
+          event.subject.fx = event.x;
+          event.subject.fy = event.y;
+        }
+
+        function dragended(event) {
+          if (!event.active) simulation.alphaTarget(0);
+          event.subject.fx = null;
+          event.subject.fy = null;
+        }
       }
 
       modelSelect.addEventListener('change', event => {

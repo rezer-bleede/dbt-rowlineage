@@ -149,7 +149,18 @@ class LineageRepository:
             mappings=mappings,
             row_lookup=lambda model, trace: self._fetch_row_by_trace(model, trace),
         )
-        return {"target_row": target_row, "hops": hops, "target_model": target_model}
+        graph = build_visual_graph(
+            target_model=target_model,
+            target_trace_id=target_trace_id,
+            target_row=target_row,
+            hops=hops,
+        )
+        return {
+            "target_row": target_row,
+            "hops": hops,
+            "target_model": target_model,
+            "graph": graph,
+        }
 
 
 class ManifestIndex:
@@ -258,6 +269,49 @@ def build_lineage_graph(
             queue.append((mapping.source_trace_id, mapping.source_model))
 
     return graph
+
+
+def build_visual_graph(
+    target_model: str, target_trace_id: str, target_row: Optional[dict], hops: List[dict]
+) -> dict:
+    """Convert lineage hops into a node-link structure for UI rendering."""
+
+    nodes: Dict[str, dict] = {}
+    edges: List[dict] = []
+
+    def ensure_node(model: str, trace_id: str, kind: str = "source") -> str:
+        node_id = f"{model}:{trace_id}"
+        existing = nodes.get(node_id)
+        if existing:
+            existing["kind"] = existing.get("kind") or kind
+            return node_id
+
+        nodes[node_id] = {
+            "id": node_id,
+            "label": model,
+            "trace_id": trace_id,
+            "kind": kind,
+        }
+        return node_id
+
+    target_id = ensure_node(target_model, target_trace_id, kind="target")
+    if target_row is not None:
+        nodes[target_id]["row"] = target_row
+
+    for hop in hops:
+        source_id = ensure_node(hop["source_model"], hop["source_trace_id"], kind="source")
+        hop_target_id = ensure_node(
+            hop["target_model"], hop["target_trace_id"], kind="intermediate"
+        )
+        edges.append(
+            {
+                "source": source_id,
+                "target": hop_target_id,
+                "label": hop.get("compiled_sql") or "",
+            }
+        )
+
+    return {"nodes": list(nodes.values()), "edges": edges}
 
 
 def create_app(repository_provider: Optional[Callable[[], LineageRepository]] = None) -> FastAPI:
