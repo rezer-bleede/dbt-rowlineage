@@ -38,6 +38,7 @@ services:
       "
     volumes:
       - ./output:/demo/output
+      - ./target:/demo/target
 
   sqlmesh:
     build:
@@ -75,6 +76,7 @@ services:
       - "8080:8080"
     volumes:
       - ./output:/demo/output
+      - ./target:/demo/target
 
 volumes:
   pgdata:
