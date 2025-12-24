@@ -26,10 +26,14 @@ Override the output format or path by passing flags such as `--export-format par
 
 ## What gets created
 
-- **Database:** Postgres database `demo` with `example_source`, `staging_model`, and `mart_model` tables.
+- **Database:** Postgres database `demo` with `example_source`, `staging_model`, `mart_model`, and a region-level aggregation `region_rollup` table that shows how grouped marts retain lineage.
 - **Lineage output:** JSONL is written to `output/lineage/` in your working directory using the dbt project configuration. Switch to Parquet by updating `rowlineage_export_format` in `dbt_project.yml` or by passing CLI overrides.
 - **Lineage UI:** A FastAPI-powered UI available at http://localhost:8080 that lists mart records and lets you click a row to see upstream lineage.
 - **Trace columns:** The adapter injects `_row_trace_id` into compiled SQL used by the export script so mappings can be generated deterministically.
+
+### Tracing aggregated marts
+
+The `region_rollup` model groups staging rows by region while preserving row lineage. The lineage UI reads dbt's `manifest.json` to discover marts dynamically, so additional models appear automatically without code changes. Click any aggregated row in the UI to see every upstream staging and seed record that contributed to the grouped result.
 
 Example JSONL line:
 
