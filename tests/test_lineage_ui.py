@@ -8,7 +8,7 @@ if str(ROOT) not in sys.path:
 
 from fastapi.testclient import TestClient
 
-from demo.ui.app import Mapping, build_lineage_graph, create_app
+from demo.ui.app import Mapping, build_lineage_graph, build_visual_graph, create_app
 
 
 def test_build_lineage_graph_traverses_upstream():
@@ -48,6 +48,40 @@ def test_build_lineage_graph_traverses_upstream():
     assert graph[1]["target_trace_id"] == "stg-1"
 
 
+def test_build_visual_graph_returns_nodes_and_edges():
+    hops = [
+        {
+            "source_model": "staging_model",
+            "target_model": "mart_model",
+            "source_trace_id": "stg-1",
+            "target_trace_id": "mart-1",
+            "compiled_sql": "select * from staging_model",
+            "executed_at": "2024-01-01T00:00:00Z",
+            "row": {"id": 1},
+        },
+        {
+            "source_model": "example_source",
+            "target_model": "staging_model",
+            "source_trace_id": "src-1",
+            "target_trace_id": "stg-1",
+            "compiled_sql": "select * from example_source",
+            "executed_at": "2024-01-01T00:00:00Z",
+            "row": {"id": 1},
+        },
+    ]
+
+    graph = build_visual_graph(
+        target_model="mart_model",
+        target_trace_id="mart-1",
+        target_row={"id": 1},
+        hops=hops,
+    )
+
+    assert {node["trace_id"] for node in graph["nodes"]} == {"mart-1", "stg-1", "src-1"}
+    assert any(edge["target"].endswith("mart-1") for edge in graph["edges"])
+    assert len(graph["edges"]) == 2
+
+
 def test_fastapi_endpoints_with_stubbed_repository(tmp_path: Path):
     class StubRepository:
         def fetch_mart_rows(self):
@@ -64,7 +98,12 @@ def test_fastapi_endpoints_with_stubbed_repository(tmp_path: Path):
         def fetch_lineage(self, model: str, trace_id: str):
             assert trace_id == "mart-1"
             assert model == "mart_model"
-            return {"target_row": self.fetch_mart_rows()[0]["rows"][0], "hops": [], "target_model": model}
+            return {
+                "target_row": self.fetch_mart_rows()[0]["rows"][0],
+                "hops": [],
+                "target_model": model,
+                "graph": {"nodes": [], "edges": []},
+            }
 
     app = create_app(repository_provider=lambda: StubRepository())
     client = TestClient(app)
