@@ -307,6 +307,10 @@ def build_visual_graph(
         hop_target_id = ensure_node(
             hop["target_model"], hop["target_trace_id"], kind="intermediate"
         )
+
+        if hop.get("row") is not None:
+            nodes[source_id].setdefault("row", hop["row"])
+
         edges.append(
             {
                 "source": source_id,

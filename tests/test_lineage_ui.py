@@ -82,6 +82,42 @@ def test_build_visual_graph_returns_nodes_and_edges():
     assert len(graph["edges"]) == 2
 
 
+def test_build_visual_graph_populates_rows_on_nodes():
+    hops = [
+        {
+            "source_model": "upstream_one",
+            "target_model": "mart_model",
+            "source_trace_id": "up-1",
+            "target_trace_id": "mart-1",
+            "compiled_sql": "select * from upstream_one",
+            "executed_at": "2024-01-01T00:00:00Z",
+            "row": {"id": 5, "region": "west"},
+        },
+        {
+            "source_model": "seed_one",
+            "target_model": "upstream_one",
+            "source_trace_id": "seed-1",
+            "target_trace_id": "up-1",
+            "compiled_sql": "select * from seed_one",
+            "executed_at": "2024-01-01T00:00:00Z",
+            "row": {"id": 2, "customer": "alice"},
+        },
+    ]
+
+    graph = build_visual_graph(
+        target_model="mart_model",
+        target_trace_id="mart-1",
+        target_row={"id": 99},
+        hops=hops,
+    )
+
+    nodes_by_trace = {node["trace_id"]: node for node in graph["nodes"]}
+
+    assert nodes_by_trace["mart-1"]["row"] == {"id": 99}
+    assert nodes_by_trace["up-1"]["row"] == {"id": 5, "region": "west"}
+    assert nodes_by_trace["seed-1"]["row"] == {"id": 2, "customer": "alice"}
+
+
 def test_fastapi_endpoints_with_stubbed_repository(tmp_path: Path):
     class StubRepository:
         def fetch_mart_rows(self):
@@ -117,3 +153,48 @@ def test_fastapi_endpoints_with_stubbed_repository(tmp_path: Path):
     lineage_response = client.get("/api/lineage/mart_model/mart-1")
     assert lineage_response.status_code == 200
     assert lineage_response.json()["target_row"]["id"] == 1
+
+
+def test_lineage_endpoint_includes_rows_in_graph():
+    class StubRepository:
+        def fetch_mart_rows(self):
+            return [
+                {
+                    "name": "mart_model",
+                    "columns": ["id", "_row_trace_id"],
+                    "rows": [{"id": 1, "_row_trace_id": "mart-1"}],
+                }
+            ]
+
+        def fetch_lineage(self, model: str, trace_id: str):
+            hops = [
+                {
+                    "source_model": "source_table",
+                    "target_model": model,
+                    "source_trace_id": "src-1",
+                    "target_trace_id": trace_id,
+                    "compiled_sql": "select * from source_table",
+                    "executed_at": "2024-01-01T00:00:00Z",
+                    "row": {"id": 44, "name": "widget"},
+                }
+            ]
+            return {
+                "target_row": {"id": 1, "_row_trace_id": trace_id},
+                "hops": hops,
+                "target_model": model,
+                "graph": build_visual_graph(
+                    target_model=model,
+                    target_trace_id=trace_id,
+                    target_row={"id": 1},
+                    hops=hops,
+                ),
+            }
+
+    app = create_app(repository_provider=lambda: StubRepository())
+    client = TestClient(app)
+
+    response = client.get("/api/lineage/mart_model/mart-1")
+
+    assert response.status_code == 200
+    graph = response.json()["graph"]
+    assert any(node.get("row", {}).get("name") == "widget" for node in graph.get("nodes", []))

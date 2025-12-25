@@ -26,6 +26,16 @@
       .legend { display: flex; align-items: center; gap: 10px; color: #203040; margin-top: 4px; flex-wrap: wrap; }
       .legend-item { display: inline-flex; align-items: center; gap: 6px; }
       .legend-swatch { width: 14px; height: 14px; border-radius: 50%; display: inline-block; }
+      .overlay { position: fixed; inset: 0; background: rgba(6, 11, 26, 0.7); display: none; align-items: center; justify-content: center; padding: 20px; }
+      .overlay.open { display: flex; }
+      .overlay-card { background: white; border-radius: 10px; max-width: 640px; width: 100%; padding: 20px; box-shadow: 0 10px 30px rgba(0, 0, 0, 0.25); max-height: 80vh; overflow: auto; }
+      .overlay-header { display: flex; justify-content: space-between; align-items: center; gap: 10px; }
+      .overlay-close { background: #d3757d; border: none; color: white; padding: 6px 10px; border-radius: 6px; cursor: pointer; }
+      .overlay-close:hover { background: #b55f66; }
+      .node-field { display: grid; grid-template-columns: 180px 1fr; gap: 8px; padding: 4px 0; border-bottom: 1px solid #f1f1f1; }
+      .node-field:last-child { border-bottom: none; }
+      .node-field-key { font-weight: bold; color: #203040; word-break: break-word; }
+      .node-field-value { color: #2f3a4f; word-break: break-word; }
     </style>
   </head>
   <body>
@@ -69,6 +79,19 @@
       <div class="hops" id="hops"></div>
     </div>
 
+    <div id="node-overlay" class="overlay" aria-hidden="true">
+      <div class="overlay-card" role="dialog" aria-modal="true" aria-labelledby="overlay-title">
+        <div class="overlay-header">
+          <div>
+            <div class="muted" id="overlay-title">Record details</div>
+            <div id="overlay-subtitle" style="font-weight: bold;"></div>
+          </div>
+          <button class="overlay-close" id="overlay-close">Close</button>
+        </div>
+        <div id="overlay-content" style="margin-top: 12px;"></div>
+      </div>
+    </div>
+
     <script src="https://cdnjs.cloudflare.com/ajax/libs/d3/7.9.0/d3.min.js" integrity="sha512-vc58qvvBdrDR4etbxMdlTt4GBQk1qjvyORR2nrsPsFPyrs+/u5c3+1Ct6upOgdZoIl7eq6k3a1UPDSNAQi/32A==" crossorigin="anonymous" referrerpolicy="no-referrer"></script>
     <script>
       const martTable = document.querySelector('#mart-table tbody');
@@ -81,6 +104,10 @@
       const headerRow = document.querySelector('#mart-table thead tr');
       const graphContainer = document.querySelector('#graph-container');
       const graphEmpty = document.querySelector('#graph-empty');
+      const overlay = document.querySelector('#node-overlay');
+      const overlayContent = document.querySelector('#overlay-content');
+      const overlaySubtitle = document.querySelector('#overlay-subtitle');
+      const overlayClose = document.querySelector('#overlay-close');
 
       let martModels = [];
 
@@ -92,6 +119,10 @@
           return 'n/a';
         }
         return value;
+      }
+
+      function shortTrace(traceId = '') {
+        return traceId.slice(-5);
       }
 
       function renderModelOptions() {
@@ -210,6 +241,41 @@
         return '#d3757d';
       }
 
+      function hideOverlay() {
+        overlay.classList.remove('open');
+        overlay.setAttribute('aria-hidden', 'true');
+      }
+
+      function showNodeDetails(nodeData) {
+        if (!nodeData) return;
+        overlaySubtitle.textContent = `${nodeData.label} · ${nodeData.trace_id}`;
+        const row = nodeData.row || {};
+        const entries = Object.entries(row);
+        if (entries.length === 0) {
+          overlayContent.innerHTML = '<div class="muted">No row values were captured for this record.</div>';
+        } else {
+          overlayContent.innerHTML = entries
+            .map(([key, value]) => `
+              <div class="node-field">
+                <div class="node-field-key">${key}</div>
+                <div class="node-field-value">${formatValue(value)}</div>
+              </div>
+            `)
+            .join('');
+        }
+
+        overlay.classList.add('open');
+        overlay.setAttribute('aria-hidden', 'false');
+      }
+
+      overlay.addEventListener('click', event => {
+        if (event.target === overlay) {
+          hideOverlay();
+        }
+      });
+
+      overlayClose.addEventListener('click', hideOverlay);
+
       function renderGraph(graph) {
         const svg = d3.select('#lineage-graph');
         svg.selectAll('*').remove();
@@ -222,81 +288,119 @@
         }
 
         graphEmpty.style.display = 'none';
-
         const width = graphContainer.clientWidth || 640;
-        const height = 420;
-        svg.attr('width', width).attr('height', height);
+        const levelHeight = 120;
+        const margin = { top: 24, right: 24, bottom: 24, left: 24 };
 
-        const link = svg
-          .append('g')
-          .attr('stroke', '#6c7aa2')
-          .attr('stroke-opacity', 0.7)
-          .selectAll('line')
-          .data(graph.edges)
-          .enter()
-          .append('line')
-          .attr('stroke-width', 1.5);
-
-        const nodeGroup = svg
-          .append('g')
-          .selectAll('g')
-          .data(graph.nodes)
-          .enter()
-          .append('g')
-          .call(
-            d3.drag()
-              .on('start', dragstarted)
-              .on('drag', dragged)
-              .on('end', dragended)
-          );
-
-        nodeGroup
-          .append('circle')
-          .attr('r', 18)
-          .attr('fill', d => nodeColor(d.kind))
-          .attr('stroke', '#ffffff')
-          .attr('stroke-width', 1.5);
-
-        nodeGroup
-          .append('text')
-          .text(d => d.label)
-          .attr('x', 22)
-          .attr('dy', '0.35em')
-          .attr('fill', '#f1f5ff')
-          .attr('font-size', '12px');
-
-        const simulation = d3
-          .forceSimulation(graph.nodes)
-          .force('link', d3.forceLink(graph.edges).id(d => d.id).distance(130))
-          .force('charge', d3.forceManyBody().strength(-260))
-          .force('center', d3.forceCenter(width / 2, height / 2));
-
-        simulation.on('tick', () => {
-          link
-            .attr('x1', d => d.source.x)
-            .attr('y1', d => d.source.y)
-            .attr('x2', d => d.target.x)
-            .attr('y2', d => d.target.y);
-
-          nodeGroup.attr('transform', d => `translate(${d.x}, ${d.y})`);
+        const nodesById = new Map(graph.nodes.map(node => [node.id, node]));
+        const childrenByTarget = new Map();
+        graph.edges.forEach(edge => {
+          if (!childrenByTarget.has(edge.target)) {
+            childrenByTarget.set(edge.target, []);
+          }
+          const upstreamNode = nodesById.get(edge.source);
+          if (upstreamNode) {
+            childrenByTarget.get(edge.target).push(upstreamNode);
+          }
         });
 
-        function dragstarted(event) {
-          if (!event.active) simulation.alphaTarget(0.2).restart();
-          event.subject.fx = event.subject.x;
-          event.subject.fy = event.subject.y;
+        const rootNode = graph.nodes.find(n => n.kind === 'target') || graph.nodes[0];
+        if (!rootNode) {
+          graphEmpty.textContent = 'No graph data available for this row yet.';
+          graphEmpty.style.display = 'block';
+          svg.attr('height', 0);
+          return;
         }
 
-        function dragged(event) {
-          event.subject.fx = event.x;
-          event.subject.fy = event.y;
+        function buildHierarchy(node, visited = new Set()) {
+          if (visited.has(node.id)) {
+            return { ...node, children: [] };
+          }
+          visited.add(node.id);
+          const children = (childrenByTarget.get(node.id) || []).map(child =>
+            buildHierarchy(child, new Set(visited))
+          );
+          return { ...node, children };
         }
 
-        function dragended(event) {
-          if (!event.active) simulation.alphaTarget(0);
-          event.subject.fx = null;
-          event.subject.fy = null;
-        }
+        const hierarchyData = buildHierarchy(rootNode);
+        const root = d3.hierarchy(hierarchyData);
+        const treeLayout = d3
+          .tree()
+          .nodeSize([180, levelHeight]);
+        treeLayout(root);
+
+        const xRange = d3.extent(root.descendants(), d => d.x);
+        const xMin = (xRange[0] ?? 0) - 50;
+        const xMax = (xRange[1] ?? 0) + 50;
+        const xScale = d3
+          .scaleLinear()
+          .domain([xMin, xMax])
+          .range([margin.left, width - margin.right]);
+
+        root.each(d => {
+          d.xPos = xScale(d.x);
+          d.yPos = margin.top + d.depth * levelHeight;
+        });
+
+        const height = margin.top + margin.bottom + (root.height + 1) * levelHeight;
+        svg.attr('width', width).attr('height', height);
+
+        const g = svg.append('g');
+
+        const link = g
+          .append('g')
+          .attr('fill', 'none')
+          .attr('stroke', '#6c7aa2')
+          .attr('stroke-opacity', 0.7)
+          .attr('stroke-width', 1.6)
+          .selectAll('path')
+          .data(root.links())
+          .enter()
+          .append('path')
+          .attr('d', d => `M${d.source.xPos},${d.source.yPos} C${d.source.xPos},${(d.source.yPos + d.target.yPos) / 2} ${d.target.xPos},${(d.source.yPos + d.target.yPos) / 2} ${d.target.xPos},${d.target.yPos}`);
+
+        const node = g
+          .append('g')
+          .selectAll('g')
+          .data(root.descendants())
+          .enter()
+          .append('g')
+          .attr('transform', d => `translate(${d.xPos},${d.yPos})`)
+          .attr('cursor', 'pointer')
+          .on('click', (event, d) => showNodeDetails(d.data));
+
+        node
+          .append('rect')
+          .attr('x', -80)
+          .attr('y', -18)
+          .attr('width', 160)
+          .attr('height', 46)
+          .attr('rx', 8)
+          .attr('fill', d => nodeColor(d.data.kind))
+          .attr('stroke', '#0d1524')
+          .attr('stroke-width', 1.5)
+          .attr('opacity', 0.95)
+          .attr('filter', 'drop-shadow(0 4px 8px rgba(0,0,0,0.25))');
+
+        node
+          .append('text')
+          .attr('text-anchor', 'middle')
+          .attr('fill', '#f9fbff')
+          .attr('font-size', '12px')
+          .attr('font-weight', '600')
+          .attr('dy', '-2')
+          .text(d => d.data.label);
+
+        node
+          .append('text')
+          .attr('text-anchor', 'middle')
+          .attr('fill', '#e3e9ff')
+          .attr('font-size', '11px')
+          .attr('dy', '14')
+          .text(d => `#${shortTrace(d.data.trace_id)}`);
+
+        link.lower();
       }
 
       modelSelect.addEventListener('change', event => {
