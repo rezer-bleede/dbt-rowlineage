@@ -278,12 +278,16 @@ def build_visual_graph(
 
     nodes: Dict[str, dict] = {}
     edges: List[dict] = []
+    kind_priority = {"source": 0, "intermediate": 1, "target": 2}
 
     def ensure_node(model: str, trace_id: str, kind: str = "source") -> str:
         node_id = f"{model}:{trace_id}"
         existing = nodes.get(node_id)
         if existing:
-            existing["kind"] = existing.get("kind") or kind
+            current_priority = kind_priority.get(existing.get("kind", "source"), 0)
+            new_priority = kind_priority.get(kind, 0)
+            if new_priority > current_priority:
+                existing["kind"] = kind
             return node_id
 
         nodes[node_id] = {
