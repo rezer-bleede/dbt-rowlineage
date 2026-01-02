@@ -30,6 +30,6 @@ demo/target/
 demo/dbt_packages/
 
 # dbt build outputs
-target/
+demo/target/*
 dbt_packages/
 logs/

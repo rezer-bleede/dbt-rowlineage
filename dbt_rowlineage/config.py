@@ -11,6 +11,7 @@ class RowLineageConfig:
     enabled: bool = True
     export_format: str = "jsonl"
     export_path: str | None = None
+    lineage_mode: str = "tokens"
 
     @classmethod
     def from_vars(cls, vars_dict: Dict[str, Any]) -> "RowLineageConfig":
@@ -18,11 +19,13 @@ class RowLineageConfig:
         enabled = settings.get("rowlineage_enabled", True)
         export_format = settings.get("rowlineage_export_format", "jsonl")
         export_path = settings.get("rowlineage_export_path")
-        return cls(enabled=enabled, export_format=export_format, export_path=export_path)
+        lineage_mode = settings.get("rowlineage_mode", "tokens")
+        return cls(enabled=enabled, export_format=export_format, export_path=export_path, lineage_mode=lineage_mode)
 
     def as_dict(self) -> Dict[str, Any]:
         return {
             "rowlineage_enabled": self.enabled,
             "rowlineage_export_format": self.export_format,
             "rowlineage_export_path": self.export_path,
+            "rowlineage_mode": self.lineage_mode,
         }

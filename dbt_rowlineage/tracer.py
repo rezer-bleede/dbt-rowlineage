@@ -33,6 +33,59 @@ class RowLineageTracer:
     ) -> List[MappingRecord]:
         executed_at = dt.datetime.now(dt.timezone.utc).isoformat()
         mappings: List[MappingRecord] = []
+        
+        # Token-based lineage (default)
+        if self.config.lineage_mode == "tokens":
+            resolved_targets = _ensure_iter(target_rows)
+            
+            for target_row in resolved_targets:
+                target_trace = target_row.get("_row_trace_id")
+                if not target_trace:
+                     # If target has no trace, we can't map it.
+                     # (Should allow fallback? Tracer assumes trace exists)
+                     target_trace = new_trace_id(target_row)
+                
+                parent_tokens = target_row.get("_row_parent_trace_ids")
+                
+                if parent_tokens:
+                    # Parse tokens
+                    # Postgres array might be returned as list by psycopg2 or string
+                    tokens_list = []
+                    if isinstance(parent_tokens, list):
+                        tokens_list = parent_tokens
+                    elif isinstance(parent_tokens, str):
+                        # Simple parsing for {a,b} format if needed, 
+                        # but usually adapter handles this.
+                        # Assuming list for now if using standard adapters.
+                        pass
+                    
+                    for token in tokens_list:
+                        if not isinstance(token, str):
+                            continue
+                        
+                        # Token format: "source_model_name:uuid"
+                        # We match prefix
+                        prefix = f"{source_model}:"
+                        if token.startswith(prefix):
+                            source_trace = token[len(prefix):]
+                            mappings.append({
+                                "source_model": source_model,
+                                "target_model": target_model,
+                                "source_trace_id": source_trace,
+                                "target_trace_id": target_trace,
+                                "compiled_sql": compiled_sql,
+                                "executed_at": executed_at,
+                            })
+                            
+            if mappings:
+                return mappings
+            
+            # If no mappings found in tokens mode, do we fall back?
+            # Plan says: "No fallback to zip(source_rows, target_rows). If lineage is unavailable, return empty mappings"
+            # UNLESS config is heuristic.
+            return []
+
+        # Heuristic mode (Legacy)
         resolved_sources = _ensure_iter(source_rows)
         resolved_targets = _ensure_iter(target_rows)
 

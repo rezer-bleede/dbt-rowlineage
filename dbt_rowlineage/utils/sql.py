@@ -5,6 +5,7 @@ from __future__ import annotations
 import re
 
 TRACE_COLUMN = "_row_trace_id"
+PARENT_TRACE_COLUMN = "_row_parent_trace_ids"
 TRACE_ALIAS = f"{TRACE_COLUMN}"
 TRACE_EXPRESSION = "md5(random()::text || clock_timestamp()::text)::uuid"
 

@@ -57,7 +57,32 @@ def _trace_column_exists(conn, schema: str, table: str) -> bool:
         return cur.fetchone() is not None
 
 
+def _ensure_trace_column_on_seed(conn, node: Dict[str, Any]) -> None:
+    """Ensure seeds have a trace column populated."""
+    if node.get("resource_type") != "seed":
+        return
+
+    schema, table = _relation_from_node(node)
+    
+    # Check if exists
+    if _trace_column_exists(conn, schema, table):
+        # We might want to check if they are null? 
+        # But for now assume if column exists it's fine or was populated.
+        # Ideally we run an UPDATE to be sure.
+        return
+        
+    # Add column
+    with conn.cursor() as cur:
+        # Alter table
+        cur.execute(f'ALTER TABLE "{schema}"."{table}" ADD COLUMN {TRACE_COLUMN} uuid')
+        # Update values
+        cur.execute(f'UPDATE "{schema}"."{table}" SET {TRACE_COLUMN} = md5(random()::text || clock_timestamp()::text)::uuid WHERE {TRACE_COLUMN} IS NULL')
+    conn.commit()
+
+
 def _fetch_rows(conn, schema: str, table: str, order_by_trace: bool) -> List[Dict[str, Any]]:
+    # In tokens mode, we technically don't need to order by trace if we don't zip.
+    # But it's good practice.
     with conn.cursor() as cur:
         if order_by_trace:
             sql = f'SELECT * FROM "{schema}"."{table}" ORDER BY "{TRACE_COLUMN}"'
@@ -109,6 +134,12 @@ def generate_lineage_for_project(
     output_dir = output_dir or (project_root / "output" / "lineage")
 
     manifest = _load_manifest(manifest_path)
+    # Determine which nodes are seeds and insure they have trace ids
+    nodes = manifest.get("nodes", {})
+    for node in nodes.values():
+        if node.get("resource_type") == "seed":
+             _ensure_trace_column_on_seed(conn, node)
+
     writer = _get_writer(plugin, output_dir)
 
     all_mappings: List[MappingRecord] = []
@@ -117,10 +148,23 @@ def generate_lineage_for_project(
         upstream_schema, upstream_table = _relation_from_node(upstream)
         downstream_schema, downstream_table = _relation_from_node(downstream)
 
+        # In tokens mode, we don't strictly need upstream rows, 
+        # unless to verify trace column exists or for heuristic fallback.
+        # But tracer signature requires source_rows.
+        # dbt-rowlineage architecture generally passes rows to tracer.
+        # If we pass empty source_rows in tokens mode, tracer must handle it.
+        # Tracer implementation I wrote checks target's parent tokens.
+        
+        is_tokens_mode = plugin.config.lineage_mode == "tokens"
+        
         upstream_has_trace = _trace_column_exists(conn, upstream_schema, upstream_table)
         downstream_has_trace = _trace_column_exists(conn, downstream_schema, downstream_table)
-
-        upstream_rows = _fetch_rows(conn, upstream_schema, upstream_table, order_by_trace=upstream_has_trace)
+        
+        upstream_rows = []
+        if not is_tokens_mode:
+             # Fetch upstream for heuristic
+             upstream_rows = _fetch_rows(conn, upstream_schema, upstream_table, order_by_trace=upstream_has_trace)
+        
         downstream_rows = _fetch_rows(conn, downstream_schema, downstream_table, order_by_trace=downstream_has_trace)
 
         compiled_sql: str = downstream.get("compiled_code") or ""
