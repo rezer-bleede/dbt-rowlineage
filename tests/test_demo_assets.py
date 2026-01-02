@@ -13,11 +13,11 @@ def test_compose_waits_for_postgres():
     assert "postgres" in compose
 
 
-def test_compose_includes_sqlpad():
+def test_compose_includes_sqlmesh_ui():
     compose = Path("demo/docker-compose.yml").read_text()
-    assert "sqlpad" in compose
-    assert "3000:3000" in compose
-    assert "sqlpad/sqlpad" in compose
+    assert "sqlmesh" in compose
+    assert "8000:8000" in compose
+    assert "sqlmesh/Dockerfile" in compose
 
 
 def test_compose_includes_lineage_ui():
@@ -73,11 +73,14 @@ def test_gitignore_excludes_dbt_artifacts():
 def test_demo_uses_nondefault_postgres_port():
     compose = Path("demo/docker-compose.yml").read_text()
     assert "6543:6543" in compose
-    assert "SQLPAD_CONNECTIONS__demo__port: 6543" in compose
+    assert "SQLMESH_PG_PORT: 6543" in compose
     assert "DBT_PORT: 6543" in compose
 
     profile = Path("demo/profiles.yml").read_text()
     assert "port: 6543" in profile
+
+    sqlmesh = Path("demo/sqlmesh/sqlmesh.yaml").read_text()
+    assert "${SQLMESH_PG_PORT:-6543}" in sqlmesh
 
 
 def test_demo_includes_aggregation_model():
