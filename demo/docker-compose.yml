@@ -40,24 +40,26 @@ services:
       - ./output:/demo/output
       - ./target:/demo/target
 
-  sqlmesh:
-    build:
-      context: .
-      dockerfile: sqlmesh/Dockerfile
+  sqlpad:
+    image: sqlpad/sqlpad:6
     depends_on:
       postgres:
         condition: service_healthy
     environment:
-      SQLMESH_PG_HOST: postgres
-      SQLMESH_PG_USER: demo
-      SQLMESH_PG_PASSWORD: demo
-      SQLMESH_PG_DB: demo
-      SQLMESH_PG_PORT: 6543
+      SQLPAD_ADMIN: admin@example.com
+      SQLPAD_ADMIN_PASSWORD: admin
+      SQLPAD_PORT: 3000
+      SQLPAD_CONNECTIONS__demo__name: Demo Postgres
+      SQLPAD_CONNECTIONS__demo__driver: postgres
+      SQLPAD_CONNECTIONS__demo__host: postgres
+      SQLPAD_CONNECTIONS__demo__port: 6543
+      SQLPAD_CONNECTIONS__demo__database: demo
+      SQLPAD_CONNECTIONS__demo__username: demo
+      SQLPAD_CONNECTIONS__demo__password: demo
     ports:
-      - "8000:8000"
+      - "3000:3000"
     volumes:
-      - ./:/app
-    working_dir: /app
+      - sqlpad-data:/var/lib/sqlpad
 
   lineage-ui:
     build:
@@ -80,3 +82,4 @@ services:
 
 volumes:
   pgdata:
+  sqlpad-data:
