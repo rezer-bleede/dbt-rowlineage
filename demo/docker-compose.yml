@@ -40,24 +40,20 @@ services:
       - ./output:/demo/output
       - ./target:/demo/target
 
-  sqlmesh:
+  code-server:
     build:
       context: .
-      dockerfile: sqlmesh/Dockerfile
+      dockerfile: code-server/Dockerfile
     depends_on:
       postgres:
         condition: service_healthy
     environment:
-      SQLMESH_PG_HOST: postgres
-      SQLMESH_PG_USER: demo
-      SQLMESH_PG_PASSWORD: demo
-      SQLMESH_PG_DB: demo
-      SQLMESH_PG_PORT: 6543
+      PASSWORD: ${CODE_SERVER_PASSWORD:-demo}
     ports:
-      - "8000:8000"
+      - "8443:8443"
     volumes:
-      - ./:/app
-    working_dir: /app
+      - ./:/home/coder/project
+    working_dir: /home/coder/project
 
   lineage-ui:
     build:
