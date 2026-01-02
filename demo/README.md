@@ -17,7 +17,7 @@ docker-compose up --build
 The command builds a Python image that installs `dbt-postgres` and the published `dbt-rowlineage` package, waits for Postgres to become healthy, installs dbt packages, seeds the example data, runs the dbt project, and then calls the `dbt-rowlineage` CLI to export lineage.
 It also starts a small UI service that can render mart rows and their upstream lineage.
 
-Postgres now listens on port `6543` inside the Compose network and on your host to avoid conflicts with any local Postgres instance already bound to `5432` or `5433`. Update the `DBT_PORT` or `SQLMESH_PG_PORT` environment variables if you need to run the stack on a different port.
+Postgres now listens on port `6543` inside the Compose network and on your host to avoid conflicts with any local Postgres instance already bound to `5432` or `5433`. Update the `DBT_PORT` environment variable if you need to run the stack on a different port.
 
 The bundled `dbt-rowlineage` CLI reads credentials from the demo's `profiles.yml`, so you don't need to manually export `DBT_DATABASE` or `DBT_USER` when the stack starts.
 Override the output format or path by passing flags such as `--export-format parquet` or `--export-path /demo/output/lineage/lineage.parquet` to the CLI invocation.
@@ -50,17 +50,17 @@ Parquet output contains the same columns.
 - `models/` contains staging and mart models that keep row counts aligned to make lineage easy to inspect.
 - `seeds/` stores the seed data (`example_source.csv`).
 - `docker/Dockerfile` installs `dbt-postgres` and the `dbt-rowlineage` adapter from PyPI and runs dbt plus the lineage export CLI.
-- `docker-compose.yml` wires together the Postgres container, the dbt runner, the lineage UI, and the SQLMesh UI, mounting `./output` so lineage artifacts are available on the host.
+- `docker-compose.yml` wires together the Postgres container, the dbt runner, the lineage UI, and a code-server instance, mounting `./output` so lineage artifacts are available on the host.
 
-## SQLMesh UI
+## Code Server IDE
 
-The demo now bundles [SQLMesh UI](https://sqlmesh.com/docs/ui) so you can explore and edit the dbt project from your browser.
+The demo now bundles [code-server](https://github.com/coder/code-server) so you can edit the dbt project from your browser.
 
-- **Access the UI:** http://localhost:8000
-- **Project mount:** The entire demo directory is mounted into `/app` inside the SQLMesh container, so saving a file in the UI updates the files on your host.
-- **dbt compatibility:** SQLMesh uses its built-in dbt compatibility to render the models defined in this project.
+- **Access the IDE:** http://localhost:8443
+- **Project mount:** The entire demo directory is mounted into `/home/coder/project` inside the code-server container, so saving a file in the IDE updates the files on your host.
+- **Authentication:** The instance uses the `PASSWORD` environment variable exposed as `CODE_SERVER_PASSWORD` in `docker-compose.yml` (default `demo`).
 
-The SQLMesh container waits for Postgres to become healthy before starting the UI. The lineage UI waits for both Postgres and the dbt run so the sample data and lineage mappings are available when the page is loaded.
+The code-server container waits for Postgres to become healthy before starting. The lineage UI waits for both Postgres and the dbt run so the sample data and lineage mappings are available when the page is loaded.
 
 ## Cleaning up
 
