@@ -11,7 +11,7 @@ class RowLineageConfig:
     enabled: bool = True
     export_format: str = "jsonl"
     export_path: str | None = None
-    lineage_mode: str = "tokens"
+    lineage_mode: str = "heuristic"
 
     @classmethod
     def from_vars(cls, vars_dict: Dict[str, Any]) -> "RowLineageConfig":
