@@ -1,8 +1,8 @@
 {{ config(materialized='table', schema='marts') }}
 
 select
-  region,
+  city_region,
   count(*) as customer_count
 from {{ ref('staging_cities') }}
-group by region
-order by region
+group by city_region
+order by city_region
