@@ -20,6 +20,8 @@ MANIFEST_FIXTURE: Dict[str, Dict] = {
             "path": "marts/mart_model.sql",
             "original_file_path": "models/marts/mart_model.sql",
             "columns": {"id": {}, "region": {}},
+            "depends_on": {"nodes": ["model.demo.staging_model"]},
+            "unique_id": "model.demo.mart_model",
         },
         "model.demo.region_rollup": {
             "name": "region_rollup",
@@ -29,6 +31,8 @@ MANIFEST_FIXTURE: Dict[str, Dict] = {
             "path": "marts/region_rollup.sql",
             "original_file_path": "models/marts/region_rollup.sql",
             "columns": {"region": {}, "customer_count": {}},
+            "depends_on": {"nodes": ["model.demo.staging_model"]},
+            "unique_id": "model.demo.region_rollup",
         },
         "model.demo.windows_rollup": {
             "name": "windows_rollup",
@@ -38,6 +42,8 @@ MANIFEST_FIXTURE: Dict[str, Dict] = {
             "path": r"marts\windows_rollup.sql",
             "original_file_path": r"marts\windows_rollup.sql",
             "columns": {"region": {}, "customer_count": {}},
+            "depends_on": {"nodes": ["model.demo.staging_model"]},
+            "unique_id": "model.demo.windows_rollup",
         },
         "model.demo.staging_model": {
             "name": "staging_model",
@@ -47,6 +53,8 @@ MANIFEST_FIXTURE: Dict[str, Dict] = {
             "path": "staging/staging_model.sql",
             "original_file_path": "models/staging/staging_model.sql",
             "columns": {"id": {}, "region": {}},
+            "depends_on": {"nodes": []},
+            "unique_id": "model.demo.staging_model",
         },
     }
 }
@@ -90,15 +98,3 @@ def test_fetch_mart_rows_uses_manifest_marts():
     assert model_lookup["region_rollup"]["rows"][0]["customer_count"] == 2
     assert TRACE_COLUMN in model_lookup["region_rollup"]["columns"]
     assert model_lookup["windows_rollup"]["rows"][0][TRACE_COLUMN] == "win-west"
-
-
-def test_manifest_index_handles_windows_style_paths():
-    index = ManifestIndex(manifest_data=MANIFEST_FIXTURE)
-
-    paths = [
-        index._normalize_path(MANIFEST_FIXTURE["nodes"]["model.demo.windows_rollup"]["path"]),
-        index._normalize_path(MANIFEST_FIXTURE["nodes"]["model.demo.windows_rollup"]["original_file_path"]),
-    ]
-
-    assert paths == ["marts/windows_rollup.sql", "marts/windows_rollup.sql"]
-    assert any(index._is_mart_path(path) for path in paths)

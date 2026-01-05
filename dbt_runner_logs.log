@@ -1,58 +1,58 @@
-time="2026-01-05T08:15:21Z" level=warning msg="/app/demo/docker-compose.yml: the attribute `version` is obsolete, it will be ignored, please remove it to avoid potential confusion"
-dbt-runner-1  | [0m08:15:03  Running with dbt=1.11.2
-dbt-runner-1  | [0m08:15:03  Checking /demo/target/*
-dbt-runner-1  | [0m08:15:03  Cleaned /demo/target/*
-dbt-runner-1  | [0m08:15:03  Checking /demo/logs/*
-dbt-runner-1  | [0m08:15:03  Cleaned /demo/logs/*
-dbt-runner-1  | [0m08:15:03  Checking /demo/dbt_packages/*
-dbt-runner-1  | [0m08:15:03  Cleaned /demo/dbt_packages/*
-dbt-runner-1  | [0m08:15:03  Finished cleaning all paths.
-dbt-runner-1  | [0m08:15:06  Running with dbt=1.11.2
-dbt-runner-1  | [0m08:15:06  Warning: No packages were found in packages.yml
-dbt-runner-1  | [0m08:15:06  Warning: No packages were found in packages.yml
-dbt-runner-1  | [0m08:15:10  Running with dbt=1.11.2
-dbt-runner-1  | [0m08:15:10  Registered adapter: postgres=1.10.0
-dbt-runner-1  | [0m08:15:10  Unable to do partial parsing because saved manifest not found. Starting full parse.
-dbt-runner-1  | [0m08:15:12  Found 8 models, 2 seeds, 463 macros
-dbt-runner-1  | [0m08:15:12
-dbt-runner-1  | [0m08:15:12  Concurrency: 4 threads (target='dev')
-dbt-runner-1  | [0m08:15:12
-dbt-runner-1  | [0m08:15:12  1 of 2 START seed file public_staging.cities ................................... [RUN]
-dbt-runner-1  | [0m08:15:12  2 of 2 START seed file public_staging.example_source ........................... [RUN]
-dbt-runner-1  | [0m08:15:12  1 of 2 OK loaded seed file public_staging.cities ............................... [[32mCREATE 15[0m in 0.22s]
-dbt-runner-1  | [0m08:15:12  2 of 2 OK loaded seed file public_staging.example_source ....................... [[32mCREATE 15[0m in 0.22s]
-dbt-runner-1  | [0m08:15:12
-dbt-runner-1  | [0m08:15:12  Finished running 2 seeds in 0 hours 0 minutes and 0.41 seconds (0.41s).
-dbt-runner-1  | [0m08:15:12
-dbt-runner-1  | [0m08:15:12  [32mCompleted successfully[0m
-dbt-runner-1  | [0m08:15:12
-dbt-runner-1  | [0m08:15:12  Done. PASS=2 WARN=0 ERROR=0 SKIP=0 NO-OP=0 TOTAL=2
-dbt-runner-1  | [0m08:15:15  Running with dbt=1.11.2
-dbt-runner-1  | [0m08:15:16  Registered adapter: postgres=1.10.0
-dbt-runner-1  | [0m08:15:16  Found 8 models, 2 seeds, 463 macros
-dbt-runner-1  | [0m08:15:16
-dbt-runner-1  | [0m08:15:16  Concurrency: 4 threads (target='dev')
-dbt-runner-1  | [0m08:15:16
-dbt-runner-1  | [0m08:15:16  1 of 8 START sql table model public_staging.staging_cities ..................... [RUN]
-dbt-runner-1  | [0m08:15:16  2 of 8 START sql table model public_staging.staging_model ...................... [RUN]
-dbt-runner-1  | [0m08:15:16  2 of 8 OK created sql table model public_staging.staging_model ................. [[32mSELECT 15[0m in 0.25s]
-dbt-runner-1  | [0m08:15:16  1 of 8 OK created sql table model public_staging.staging_cities ................ [[32mSELECT 15[0m in 0.26s]
-dbt-runner-1  | [0m08:15:16  3 of 8 START sql table model public_marts.cities_rollup ........................ [RUN]
-dbt-runner-1  | [0m08:15:16  4 of 8 START sql table model public_marts.count_rollup ......................... [RUN]
-dbt-runner-1  | [0m08:15:16  5 of 8 START sql table model public_marts.mart_model ........................... [RUN]
-dbt-runner-1  | [0m08:15:16  6 of 8 START sql table model public_marts.region_rollup ........................ [RUN]
-dbt-runner-1  | [0m08:15:17  3 of 8 OK created sql table model public_marts.cities_rollup ................... [[32mSELECT 4[0m in 0.17s]
-dbt-runner-1  | [0m08:15:17  4 of 8 OK created sql table model public_marts.count_rollup .................... [[32mSELECT 1[0m in 0.17s]
-dbt-runner-1  | [0m08:15:17  7 of 8 START sql table model public_marts.region_rollup2 ....................... [RUN]
-dbt-runner-1  | [0m08:15:17  6 of 8 OK created sql table model public_marts.region_rollup ................... [[32mSELECT 4[0m in 0.16s]
-dbt-runner-1  | [0m08:15:17  5 of 8 OK created sql table model public_marts.mart_model ...................... [[32mSELECT 15[0m in 0.17s]
-dbt-runner-1  | [0m08:15:17  7 of 8 OK created sql table model public_marts.region_rollup2 .................. [[32mSELECT 4[0m in 0.07s]
-dbt-runner-1  | [0m08:15:17  8 of 8 START sql table model public_marts.top_level ............................ [RUN]
-dbt-runner-1  | [0m08:15:17  8 of 8 OK created sql table model public_marts.top_level ....................... [[32mSELECT 4[0m in 0.06s]
-dbt-runner-1  | [0m08:15:17
-dbt-runner-1  | [0m08:15:17  Finished running 8 table models in 0 hours 0 minutes and 0.87 seconds (0.87s).
-dbt-runner-1  | [0m08:15:17
-dbt-runner-1  | [0m08:15:17  [32mCompleted successfully[0m
-dbt-runner-1  | [0m08:15:17
-dbt-runner-1  | [0m08:15:17  Done. PASS=8 WARN=0 ERROR=0 SKIP=0 NO-OP=0 TOTAL=8
+time="2026-01-05T08:54:28Z" level=warning msg="/app/demo/docker-compose.yml: the attribute `version` is obsolete, it will be ignored, please remove it to avoid potential confusion"
+dbt-runner-1  | [0m08:53:50  Running with dbt=1.11.2
+dbt-runner-1  | [0m08:53:50  Checking /demo/target/*
+dbt-runner-1  | [0m08:53:50  Cleaned /demo/target/*
+dbt-runner-1  | [0m08:53:50  Checking /demo/dbt_packages/*
+dbt-runner-1  | [0m08:53:50  Cleaned /demo/dbt_packages/*
+dbt-runner-1  | [0m08:53:50  Checking /demo/logs/*
+dbt-runner-1  | [0m08:53:50  Cleaned /demo/logs/*
+dbt-runner-1  | [0m08:53:50  Finished cleaning all paths.
+dbt-runner-1  | [0m08:53:54  Running with dbt=1.11.2
+dbt-runner-1  | [0m08:53:54  Warning: No packages were found in packages.yml
+dbt-runner-1  | [0m08:53:54  Warning: No packages were found in packages.yml
+dbt-runner-1  | [0m08:53:59  Running with dbt=1.11.2
+dbt-runner-1  | [0m08:53:59  Registered adapter: postgres=1.10.0
+dbt-runner-1  | [0m08:54:00  Unable to do partial parsing because saved manifest not found. Starting full parse.
+dbt-runner-1  | [0m08:54:03  Found 8 models, 2 seeds, 463 macros
+dbt-runner-1  | [0m08:54:03
+dbt-runner-1  | [0m08:54:03  Concurrency: 4 threads (target='dev')
+dbt-runner-1  | [0m08:54:03
+dbt-runner-1  | [0m08:54:03  1 of 2 START seed file public_staging.cities ................................... [RUN]
+dbt-runner-1  | [0m08:54:03  2 of 2 START seed file public_staging.example_source ........................... [RUN]
+dbt-runner-1  | [0m08:54:03  2 of 2 OK loaded seed file public_staging.example_source ....................... [[32mCREATE 15[0m in 0.30s]
+dbt-runner-1  | [0m08:54:03  1 of 2 OK loaded seed file public_staging.cities ............................... [[32mCREATE 15[0m in 0.31s]
+dbt-runner-1  | [0m08:54:03
+dbt-runner-1  | [0m08:54:03  Finished running 2 seeds in 0 hours 0 minutes and 0.78 seconds (0.78s).
+dbt-runner-1  | [0m08:54:04
+dbt-runner-1  | [0m08:54:04  [32mCompleted successfully[0m
+dbt-runner-1  | [0m08:54:04
+dbt-runner-1  | [0m08:54:04  Done. PASS=2 WARN=0 ERROR=0 SKIP=0 NO-OP=0 TOTAL=2
+dbt-runner-1  | [0m08:54:07  Running with dbt=1.11.2
+dbt-runner-1  | [0m08:54:07  Registered adapter: postgres=1.10.0
+dbt-runner-1  | [0m08:54:08  Found 8 models, 2 seeds, 463 macros
+dbt-runner-1  | [0m08:54:08
+dbt-runner-1  | [0m08:54:08  Concurrency: 4 threads (target='dev')
+dbt-runner-1  | [0m08:54:08
+dbt-runner-1  | [0m08:54:08  1 of 8 START sql table model public_staging.staging_cities ..................... [RUN]
+dbt-runner-1  | [0m08:54:08  2 of 8 START sql table model public_staging.staging_model ...................... [RUN]
+dbt-runner-1  | [0m08:54:08  2 of 8 OK created sql table model public_staging.staging_model ................. [[32mSELECT 15[0m in 0.32s]
+dbt-runner-1  | [0m08:54:08  1 of 8 OK created sql table model public_staging.staging_cities ................ [[32mSELECT 15[0m in 0.32s]
+dbt-runner-1  | [0m08:54:08  3 of 8 START sql table model public_marts.count_rollup ......................... [RUN]
+dbt-runner-1  | [0m08:54:08  4 of 8 START sql table model public_marts.mart_model ........................... [RUN]
+dbt-runner-1  | [0m08:54:08  5 of 8 START sql table model public_marts.region_rollup ........................ [RUN]
+dbt-runner-1  | [0m08:54:08  6 of 8 START sql table model public_marts.region_rollup2 ....................... [RUN]
+dbt-runner-1  | [0m08:54:09  3 of 8 OK created sql table model public_marts.count_rollup .................... [[32mSELECT 1[0m in 0.22s]
+dbt-runner-1  | [0m08:54:09  4 of 8 OK created sql table model public_marts.mart_model ...................... [[32mSELECT 15[0m in 0.22s]
+dbt-runner-1  | [0m08:54:09  7 of 8 START sql table model public_marts.cities_rollup ........................ [RUN]
+dbt-runner-1  | [0m08:54:09  6 of 8 OK created sql table model public_marts.region_rollup2 .................. [[32mSELECT 4[0m in 0.24s]
+dbt-runner-1  | [0m08:54:09  8 of 8 START sql table model public_marts.top_level ............................ [RUN]
+dbt-runner-1  | [0m08:54:09  5 of 8 OK created sql table model public_marts.region_rollup ................... [[32mSELECT 4[0m in 0.25s]
+dbt-runner-1  | [0m08:54:09  7 of 8 OK created sql table model public_marts.cities_rollup ................... [[32mSELECT 4[0m in 0.13s]
+dbt-runner-1  | [0m08:54:09  8 of 8 OK created sql table model public_marts.top_level ....................... [[32mSELECT 4[0m in 0.11s]
+dbt-runner-1  | [0m08:54:09
+dbt-runner-1  | [0m08:54:09  Finished running 8 table models in 0 hours 0 minutes and 1.02 seconds (1.02s).
+dbt-runner-1  | [0m08:54:09
+dbt-runner-1  | [0m08:54:09  [32mCompleted successfully[0m
+dbt-runner-1  | [0m08:54:09
+dbt-runner-1  | [0m08:54:09  Done. PASS=8 WARN=0 ERROR=0 SKIP=0 NO-OP=0 TOTAL=8
 dbt-runner-1  | [dbt-rowlineage] Generated 95 lineage mappings.

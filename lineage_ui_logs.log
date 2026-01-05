@@ -1,0 +1,5 @@
+time="2026-01-05T08:54:28Z" level=warning msg="/app/demo/docker-compose.yml: the attribute `version` is obsolete, it will be ignored, please remove it to avoid potential confusion"
+lineage-ui-1  | INFO:     Started server process [1]
+lineage-ui-1  | INFO:     Waiting for application startup.
+lineage-ui-1  | INFO:     Application startup complete.
+lineage-ui-1  | INFO:     Uvicorn running on http://0.0.0.0:8080 (Press CTRL+C to quit)

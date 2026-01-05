@@ -186,41 +186,27 @@ class ManifestIndex:
                     return schema, table
         return None
 
-    def _path_candidates(self, node: Dict) -> List[str]:
-        return [
-            str(node.get("path", "")),
-            str(node.get("original_file_path", "")),
-        ]
-
-    def _normalize_path(self, path: str) -> str:
-        """Normalize manifest paths for reliable mart detection.
-
-        Manifest paths can vary depending on the operating system and dbt
-        configuration. Windows builds, for example, emit backslashes while
-        some projects omit the leading ``models/`` prefix entirely. We convert
-        backslashes to forward slashes and strip optional ``./`` and
-        ``models/`` prefixes so downstream checks can rely on a consistent
-        shape.
-        """
-
-        normalized = path.replace("\\", "/").lstrip("./")
-        while normalized.startswith("models/"):
-            normalized = normalized[len("models/") :]
-        return normalized
-
-    def _is_mart_path(self, path: str) -> bool:
-        normalized = self._normalize_path(path)
-        return normalized.startswith("marts/") or "/marts/" in normalized
-
     def mart_models(self) -> List[Dict]:
+        nodes = list(self._iter_nodes())
+        queryable_types = {"model", "seed", "snapshot"}
+
+        # All unique IDs of nodes that are dependencies for other nodes
+        dependency_ids = set()
+        for node in nodes:
+            for dep_id in node.get("depends_on", {}).get("nodes", []):
+                dependency_ids.add(dep_id)
+
+        # Find models that are not dependencies for any other model
         mart_nodes = [
             node
-            for node in self._iter_nodes()
-            if node.get("resource_type") == "model"
-            and any(self._is_mart_path(path) for path in self._path_candidates(node))
+            for node in nodes
+            if node.get("resource_type") in queryable_types
+            and node.get("unique_id") not in dependency_ids
         ]
+
         if mart_nodes:
             return mart_nodes
+
         # Fallback for minimal environments without manifest metadata
         return [node for node in self._iter_nodes() if node.get("name") == "mart_model"]
 
