@@ -110,23 +110,61 @@ class LineageRepository:
         with self.lineage_path.open() as handle:
             return [Mapping.from_json(json.loads(line)) for line in handle if line.strip()]
 
-    def fetch_mart_rows(self) -> List[dict]:
-        models = []
-        mart_models = self.manifest.mart_models()
+    def _root_models_from_mappings(self, mappings: List[Mapping]) -> List[str]:
+        """
+        Infer top‑level (mart) models directly from lineage mappings.
 
-        for node in mart_models:
-            relation = self.manifest.resolve_relation(node.get("name", ""))
+        A "root" model is any model that only appears as a target in the
+        lineage graph and never as a source. This is computed dynamically
+        from the mappings so it works for arbitrary depths and shapes of
+        the DAG without relying on folder or schema conventions.
+        """
+        if not mappings:
+            return []
+
+        source_models = {m.source_model for m in mappings}
+        target_models = {m.target_model for m in mappings}
+
+        roots = target_models - source_models
+        if roots:
+            return sorted(roots)
+
+        # Degenerate case: if every target also appears as a source, fall
+        # back to treating all targets as potential roots.
+        if target_models:
+            return sorted(target_models)
+        return sorted(source_models)
+
+    def fetch_mart_rows(self) -> List[dict]:
+        models: List[dict] = []
+
+        # Prefer dynamic discovery from lineage mappings so the UI reflects
+        # whatever the export actually produced, regardless of folder or
+        # schema layout.
+        mappings = self._load_mappings()
+        mart_model_names = self._root_models_from_mappings(mappings)
+
+        # If no mappings are available yet (e.g. before the export has run),
+        # fall back to manifest‑based mart discovery to keep the demo usable.
+        if not mart_model_names:
+            mart_nodes = self.manifest.mart_models()
+            mart_model_names = [
+                node.get("name", "") for node in mart_nodes if node.get("name")
+            ]
+
+        for model_name in mart_model_names:
+            relation = self.manifest.resolve_relation(model_name)
             if relation is None:
                 continue
             schema, table = relation
             sql = f"select * from {schema}.{table} order by 1"
             rows = self._fetch_rows(sql)
-            columns = self.manifest.columns_for_model(node.get("name", ""))
+            columns = self.manifest.columns_for_model(model_name)
             if not columns and rows:
                 columns = list(rows[0].keys())
             if TRACE_COLUMN not in columns:
                 columns.append(TRACE_COLUMN)
-            models.append({"name": node.get("name"), "columns": columns, "rows": rows})
+            models.append({"name": model_name, "columns": columns, "rows": rows})
 
         return models
 
