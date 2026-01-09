@@ -65,8 +65,9 @@ def test_get_connection_defaults_to_new_port(monkeypatch, tmp_path):
         output_dir=None,
     )
 
-    conn = cli._get_connection(args, project_root)
+    conn, adapter_type = cli._get_connection(args, project_root)
     assert isinstance(conn, DummyConn)
+    assert adapter_type == "postgres"
     assert captured.get("port") == 6543
 
 
@@ -82,6 +83,7 @@ def test_load_profile_connection(tmp_path, monkeypatch):
         "database": "demo_db",
         "user": "demo_user",
         "password": "secret",
+        "type": "postgres",
     }
 
 
@@ -112,8 +114,9 @@ def test_get_connection_uses_profile_defaults(monkeypatch, tmp_path):
         output_dir=None,
     )
 
-    conn = cli._get_connection(args, project_root)
+    conn, adapter_type = cli._get_connection(args, project_root)
     assert isinstance(conn, DummyConn)
+    assert adapter_type == "postgres"
     assert captured == {
         "host": "profile-host",
         "port": 6543,
@@ -150,6 +153,7 @@ def test_main_succeeds_with_profile(monkeypatch, tmp_path, capsys):
     assert exit_code == 0
     assert isinstance(calls.get("conn"), DummyConn)
     assert calls.get("project_root") == project_root
+    assert calls.get("adapter_type") == "postgres"
 
     captured = capsys.readouterr()
     assert "Generated 0 lineage mappings" in captured.out

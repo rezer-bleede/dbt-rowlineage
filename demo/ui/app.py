@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import importlib
 import json
 import os
 from dataclasses import dataclass
@@ -36,20 +37,29 @@ class Mapping:
         )
 
 
-class LineageRepository:
-    def __init__(
+class DatabaseClient:
+    def fetch_rows(
         self,
-        lineage_path: Path | None = None,
-        manifest_path: Path | None = None,
-        manifest_index: "ManifestIndex | None" = None,
-    ):
-        self.lineage_path = lineage_path or Path("/demo/output/lineage/lineage.jsonl")
-        self.dbname = os.getenv("DBT_DATABASE", "demo")
-        self.user = os.getenv("DBT_USER", "demo")
-        self.password = os.getenv("DBT_PASSWORD", "demo")
-        self.host = os.getenv("DBT_HOST", "postgres")
-        self.port = int(os.getenv("DBT_PORT", "6543"))
-        self.manifest = manifest_index or ManifestIndex(manifest_path)
+        schema: str,
+        table: str,
+        *,
+        order_by_trace: bool = False,
+        trace_id: str | None = None,
+        limit: int | None = None,
+    ) -> List[dict]:
+        raise NotImplementedError
+
+    def has_column(self, schema: str, table: str, column: str) -> bool:
+        raise NotImplementedError
+
+
+class PostgresDatabaseClient(DatabaseClient):
+    def __init__(self, dbname: str, user: str, password: str, host: str, port: int):
+        self.dbname = dbname
+        self.user = user
+        self.password = password
+        self.host = host
+        self.port = port
 
     def _connect(self):
         return psycopg2.connect(
@@ -60,49 +70,151 @@ class LineageRepository:
             port=self.port,
         )
 
-    def _fetch_rows(self, sql: str, params: Iterable | None = None) -> List[dict]:
+    def fetch_rows(
+        self,
+        schema: str,
+        table: str,
+        *,
+        order_by_trace: bool = False,
+        trace_id: str | None = None,
+        limit: int | None = None,
+    ) -> List[dict]:
+        params: Dict[str, object] = {}
+        sql = f'SELECT * FROM "{schema}"."{table}"'
+        if trace_id is not None:
+            sql += f' WHERE "{TRACE_COLUMN}" = %(trace_id)s'
+            params["trace_id"] = trace_id
+        sql += f' ORDER BY "{TRACE_COLUMN}"' if order_by_trace else " ORDER BY 1"
+        if limit is not None:
+            sql += " LIMIT %(limit)s"
+            params["limit"] = limit
+
         with self._connect() as conn:
             with conn.cursor() as cur:
-                cur.execute(sql, params or [])
+                cur.execute(sql, params)
                 columns = [c[0] for c in cur.description]
-                rows = [dict(zip(columns, row)) for row in cur.fetchall()]
+                return [dict(zip(columns, row)) for row in cur.fetchall()]
 
-        if TRACE_COLUMN not in columns:
-            for row in rows:
-                row[TRACE_COLUMN] = new_trace_id(row)
-        return rows
+    def has_column(self, schema: str, table: str, column: str) -> bool:
+        sql = (
+            "SELECT 1 FROM information_schema.columns "
+            "WHERE table_schema = %(schema)s AND table_name = %(table)s AND column_name = %(column)s"
+        )
+        with self._connect() as conn:
+            with conn.cursor() as cur:
+                cur.execute(sql, {"schema": schema, "table": table, "column": column})
+                return cur.fetchone() is not None
+
+
+class ClickHouseDatabaseClient(DatabaseClient):
+    def __init__(self, dbname: str, user: str, password: str, host: str, port: int):
+        clickhouse_connect = importlib.import_module("clickhouse_connect")
+        self.client = clickhouse_connect.get_client(
+            host=host,
+            port=port,
+            username=user,
+            password=password,
+            database=dbname,
+        )
+
+    @staticmethod
+    def _escape(value: str) -> str:
+        return value.replace("'", "''")
+
+    def fetch_rows(
+        self,
+        schema: str,
+        table: str,
+        *,
+        order_by_trace: bool = False,
+        trace_id: str | None = None,
+        limit: int | None = None,
+    ) -> List[dict]:
+        order_by = TRACE_COLUMN if order_by_trace else "1"
+        sql = f"SELECT * FROM {schema}.{table}"
+        if trace_id is not None:
+            escaped = self._escape(trace_id)
+            sql += f" WHERE {TRACE_COLUMN} = '{escaped}'"
+        sql += f" ORDER BY {order_by}"
+        if limit is not None:
+            sql += f" LIMIT {limit}"
+
+        result = self.client.query(sql)
+        columns = result.column_names
+        return [dict(zip(columns, row)) for row in result.result_rows]
+
+    def has_column(self, schema: str, table: str, column: str) -> bool:
+        sql = (
+            "SELECT 1 FROM system.columns "
+            f"WHERE database = '{self._escape(schema)}' "
+            f"AND table = '{self._escape(table)}' "
+            f"AND name = '{self._escape(column)}' "
+            "LIMIT 1"
+        )
+        result = self.client.query(sql)
+        return bool(result.result_rows)
+
+
+class LineageRepository:
+    def __init__(
+        self,
+        lineage_path: Path | None = None,
+        manifest_path: Path | None = None,
+        manifest_index: "ManifestIndex | None" = None,
+        adapter_type: str | None = None,
+        db_client: DatabaseClient | None = None,
+    ):
+        self.lineage_path = lineage_path or Path("/demo/output/lineage/lineage.jsonl")
+        self.dbname = os.getenv("DBT_DATABASE", "demo")
+        self.user = os.getenv("DBT_USER", "demo")
+        self.password = os.getenv("DBT_PASSWORD", "demo")
+        self.host = os.getenv("DBT_HOST", "postgres")
+        self.port = int(os.getenv("DBT_PORT", "6543"))
+        self.adapter_type = (adapter_type or os.getenv("DBT_ADAPTER", "postgres")).lower()
+        self.db_client = db_client or self._build_db_client()
+        self.manifest = manifest_index or ManifestIndex(manifest_path)
+
+    def _build_db_client(self) -> DatabaseClient:
+        if self.adapter_type.startswith("clickhouse"):
+            return ClickHouseDatabaseClient(
+                dbname=self.dbname,
+                user=self.user,
+                password=self.password,
+                host=self.host,
+                port=self.port,
+            )
+        return PostgresDatabaseClient(
+            dbname=self.dbname,
+            user=self.user,
+            password=self.password,
+            host=self.host,
+            port=self.port,
+        )
 
     def _fetch_row_by_trace(self, model: str, trace_id: str) -> Optional[dict]:
         relation = self.manifest.resolve_relation(model)
         if relation is None:
             return None
         schema, table = relation
-        
-        # First check if the table has the trace column
-        with self._connect() as conn:
-            with conn.cursor() as cur:
-                cur.execute(f"SELECT column_name FROM information_schema.columns WHERE table_schema = %s AND table_name = %s AND column_name = %s", 
-                           (schema, table, TRACE_COLUMN))
-                has_trace_column = cur.fetchone() is not None
-        
+
+        has_trace_column = self.db_client.has_column(schema, table, TRACE_COLUMN)
+
         if has_trace_column:
-            # Table has trace column, query by trace ID
-            sql = (
-                f"select * from {schema}.{table} where {TRACE_COLUMN} = %s "
-                "order by 1 limit 1"
+            rows = self.db_client.fetch_rows(
+                schema,
+                table,
+                trace_id=trace_id,
+                limit=1,
             )
-            rows = self._fetch_rows(sql, (trace_id,))
             return rows[0] if rows else None
-        else:
-            # Table doesn't have trace column (e.g., seed tables)
-            # Fetch all rows and generate trace IDs, then find the matching one
-            sql = f"select * from {schema}.{table} order by 1"
-            rows = self._fetch_rows(sql)
-            # Find the row that would have this trace ID
-            for row in rows:
-                if row.get(TRACE_COLUMN) == trace_id:
-                    return row
-            return None
+
+        rows = self.db_client.fetch_rows(schema, table)
+        for row in rows:
+            if TRACE_COLUMN not in row:
+                row[TRACE_COLUMN] = new_trace_id(row)
+            if row.get(TRACE_COLUMN) == trace_id:
+                return row
+        return None
 
     def _load_mappings(self) -> List[Mapping]:
         if not self.lineage_path.exists():
@@ -157,8 +269,10 @@ class LineageRepository:
             if relation is None:
                 continue
             schema, table = relation
-            sql = f"select * from {schema}.{table} order by 1"
-            rows = self._fetch_rows(sql)
+            rows = self.db_client.fetch_rows(schema, table)
+            if rows and TRACE_COLUMN not in rows[0]:
+                for row in rows:
+                    row[TRACE_COLUMN] = new_trace_id(row)
             columns = self.manifest.columns_for_model(model_name)
             if not columns and rows:
                 columns = list(rows[0].keys())
@@ -173,9 +287,10 @@ class LineageRepository:
         if relation is None:
             raise HTTPException(status_code=404, detail="Unknown model")
 
-        target_rows = self._fetch_rows(
-            f"select * from {relation[0]}.{relation[1]} order by 1"
-        )
+        target_rows = self.db_client.fetch_rows(relation[0], relation[1])
+        if target_rows and TRACE_COLUMN not in target_rows[0]:
+            for row in target_rows:
+                row[TRACE_COLUMN] = new_trace_id(row)
         target_row = next((row for row in target_rows if row.get(TRACE_COLUMN) == target_trace_id), None)
         if not target_row:
             raise HTTPException(status_code=404, detail="Mart record not found")

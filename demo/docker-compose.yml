@@ -18,6 +18,24 @@ services:
     volumes:
       - pgdata:/var/lib/postgresql/data
 
+  clickhouse:
+    image: clickhouse/clickhouse-server:24.3-alpine
+    environment:
+      CLICKHOUSE_DB: demo
+      CLICKHOUSE_USER: demo
+      CLICKHOUSE_PASSWORD: demo
+      CLICKHOUSE_DEFAULT_ACCESS_MANAGEMENT: 1
+    ports:
+      - "8123:8123"
+      - "9000:9000"
+    healthcheck:
+      test: ["CMD-SHELL", "clickhouse-client --user demo --password demo --query \"select 1\""]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+    volumes:
+      - chdata:/var/lib/clickhouse
+
   dbt-runner:
     build:
       context: ..
@@ -39,6 +57,33 @@ services:
     volumes:
       - ./output:/demo/output
       - ./target:/demo/target
+
+  dbt-runner-clickhouse:
+    build:
+      context: ..
+      dockerfile: demo/docker/Dockerfile
+    environment:
+      DBT_PROFILES_DIR: /demo
+      DBT_TARGET: clickhouse
+      DBT_DATABASE: demo
+      DBT_USER: demo
+      DBT_PASSWORD: demo
+      DBT_HOST: clickhouse
+      DBT_PORT: 8123
+    depends_on:
+      clickhouse:
+        condition: service_healthy
+    command: >
+      bash -c "
+        dbt deps &&
+        dbt seed &&
+        dbt run &&
+        dbt-rowlineage --project-root /demo &&
+        tail -f /dev/null
+      "
+    volumes:
+      - ./output-clickhouse:/demo/output
+      - ./target-clickhouse:/demo/target
 
   code-server:
     build:
@@ -74,5 +119,26 @@ services:
       - ./output:/demo/output
       - ./target:/demo/target
 
+  lineage-ui-clickhouse:
+    build:
+      context: ..
+      dockerfile: demo/ui/Dockerfile
+    depends_on:
+      clickhouse:
+        condition: service_healthy
+    environment:
+      DBT_DATABASE: demo
+      DBT_USER: demo
+      DBT_PASSWORD: demo
+      DBT_HOST: clickhouse
+      DBT_PORT: 8123
+      DBT_ADAPTER: clickhouse
+    ports:
+      - "8081:8080"
+    volumes:
+      - ./output-clickhouse:/demo/output
+      - ./target-clickhouse:/demo/target
+
 volumes:
   pgdata:
+  chdata:
