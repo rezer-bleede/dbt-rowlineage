@@ -12,6 +12,12 @@ pip install dbt-rowlineage
 
 After installation the plugin is discovered automatically by dbt; keep using your existing adapter (for example `postgres`, `bigquery`, or `snowflake`) and enable row lineage with vars and model configs.
 
+If you plan to use the CLI against ClickHouse, install the optional extra so the ClickHouse client is available:
+
+```bash
+pip install "dbt-rowlineage[clickhouse]"
+```
+
 ### Command line utility
 
 The project ships a `dbt-rowlineage` CLI that can export lineage for a compiled dbt project. Connection parameters are read in this order:
@@ -78,14 +84,14 @@ The lineage mapping table schema:
 
 ## Demo with Docker Compose
 
-A ready-to-run demo lives in the `demo/` directory and uses Docker Compose to provision Postgres, install `dbt-rowlineage` from PyPI, run dbt end-to-end, and expose a lightweight lineage explorer UI. From the repository root:
+A ready-to-run demo lives in the `demo/` directory and uses Docker Compose to provision Postgres and ClickHouse, install `dbt-rowlineage` from PyPI, run dbt end-to-end for each adapter, and expose lightweight lineage explorer UIs. From the repository root:
 
 ```bash
 cd demo
 docker-compose up --build
 ```
 
-Lineage artifacts are written to `demo/output/lineage/` by the `dbt-rowlineage` CLI rather than a helper script. The Compose entrypoint now installs packages and seeds the demo data before the first `dbt run`, preventing missing table errors for `example_source`. After the stack comes up, visit http://localhost:8080 to browse mart rows—including the aggregated `region_rollup` mart—and trace them back to staging and source records in both a descriptive list and an interactive graph. See `demo/README.md` for full instructions and an example JSONL record.
+Lineage artifacts are written to `demo/output/lineage/` for Postgres and `demo/output-clickhouse/lineage/` for ClickHouse by the `dbt-rowlineage` CLI rather than a helper script. The Compose entrypoint now installs packages and seeds the demo data before the first `dbt run`, preventing missing table errors for `example_source`. After the stack comes up, visit http://localhost:8080 (Postgres) or http://localhost:8081 (ClickHouse) to browse mart rows—including the aggregated `region_rollup` mart—and trace them back to staging and source records in both a descriptive list and an interactive graph. See `demo/README.md` for full instructions and an example JSONL record.
 When your dbt project keeps marts under a folder such as `marts/` (without the `models/` prefix baked into the manifest `path`), the lineage UI still discovers them so the dropdown stays populated instead of reporting that no mart rows were found. On Windows, manifest entries can include backslashes instead of forward slashes; those paths are normalized before filtering so marts are still listed.
 
 The graph view renders a rooted tree that keeps the selected mart record at the top and fans upstream sources downward for a stable, readable layout. Each node shows the model name and a short trace ID, and clicking a node opens an overlay listing every captured column value for that record.

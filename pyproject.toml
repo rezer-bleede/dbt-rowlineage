@@ -40,6 +40,9 @@ dev = [
     "psycopg2-binary>=2.9",
     "httpx>=0.27",
 ]
+clickhouse = [
+    "clickhouse-connect>=0.7",
+]
 
 [project.entry-points."dbt.adapters"]
 rowlineage = "dbt_rowlineage.plugin:RowLineagePlugin"
@@ -60,4 +63,3 @@ version = { attr = "dbt_rowlineage.__version__" }
 
 [project.scripts]
 dbt-rowlineage = "dbt_rowlineage.cli:main"
-

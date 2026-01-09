@@ -4,13 +4,14 @@ from pathlib import Path
 def test_dockerfile_uses_pypi_package():
     dockerfile = Path("demo/docker/Dockerfile").read_text()
     assert "dbt-rowlineage" in dockerfile
-    assert "pip install --no-cache-dir dbt-postgres dbt-rowlineage" in dockerfile
+    assert "pip install --no-cache-dir dbt-postgres dbt-clickhouse clickhouse-connect dbt-rowlineage" in dockerfile
 
 
 def test_compose_waits_for_postgres():
     compose = Path("demo/docker-compose.yml").read_text()
     assert "service_healthy" in compose
     assert "postgres" in compose
+    assert "clickhouse" in compose
 
 
 def test_compose_includes_code_server():
@@ -25,6 +26,7 @@ def test_compose_includes_lineage_ui():
     assert "lineage-ui" in compose
     assert "demo/ui/Dockerfile" in compose
     assert "8080:8080" in compose
+    assert "8081:8080" in compose
 
 
 def test_dbt_project_exports_lineage():
@@ -59,6 +61,7 @@ def test_docker_compose_runs_cli_lineage_export():
 def test_profile_uses_base_adapter():
     profile = Path("demo/profiles.yml").read_text()
     assert "type: postgres" in profile
+    assert "type: clickhouse" in profile
     assert "type: rowlineage" not in profile
     assert "base_adapter" not in profile
 

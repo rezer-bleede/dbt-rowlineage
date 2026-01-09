@@ -10,3 +10,11 @@ rowlineage_demo:
       dbname: demo
       schema: public
       threads: 4
+    clickhouse:
+      type: clickhouse
+      host: clickhouse
+      user: demo
+      password: demo
+      port: 8123
+      schema: demo
+      threads: 4

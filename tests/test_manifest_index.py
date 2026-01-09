@@ -52,24 +52,44 @@ MANIFEST_FIXTURE: Dict[str, Dict] = {
 }
 
 
-class StubRepository(LineageRepository):
-    def __init__(self):
-        super().__init__(manifest_index=ManifestIndex(manifest_data=MANIFEST_FIXTURE))
-
-    def _fetch_rows(self, sql: str, params: List | None = None) -> List[dict]:  # type: ignore[override]
-        if "region_rollup" in sql:
-            return [
+class FakeDatabaseClient:
+    def fetch_rows(
+        self,
+        schema: str,
+        table: str,
+        *,
+        order_by_trace: bool = False,
+        trace_id: str | None = None,
+        limit: int | None = None,
+    ) -> List[dict]:
+        if table == "region_rollup":
+            rows = [
                 {"region": "west", "customer_count": 2, TRACE_COLUMN: "agg-west"},
                 {"region": "east", "customer_count": 1, TRACE_COLUMN: "agg-east"},
             ]
-        if "windows_rollup" in sql:
-            return [
-                {"region": "west", "customer_count": 3, TRACE_COLUMN: "win-west"},
+        elif table == "windows_rollup":
+            rows = [{"region": "west", "customer_count": 3, TRACE_COLUMN: "win-west"}]
+        else:
+            rows = [
+                {"id": 1, "region": "west", TRACE_COLUMN: "mart-1"},
+                {"id": 2, "region": "east", TRACE_COLUMN: "mart-2"},
             ]
-        return [
-            {"id": 1, "region": "west", TRACE_COLUMN: "mart-1"},
-            {"id": 2, "region": "east", TRACE_COLUMN: "mart-2"},
-        ]
+        if trace_id is not None:
+            rows = [row for row in rows if row.get(TRACE_COLUMN) == trace_id]
+        if limit is not None:
+            rows = rows[:limit]
+        return rows
+
+    def has_column(self, schema: str, table: str, column: str) -> bool:
+        return column == TRACE_COLUMN
+
+
+class StubRepository(LineageRepository):
+    def __init__(self):
+        super().__init__(
+            manifest_index=ManifestIndex(manifest_data=MANIFEST_FIXTURE),
+            db_client=FakeDatabaseClient(),
+        )
 
 
 def test_manifest_index_detects_marts_without_models_prefix():

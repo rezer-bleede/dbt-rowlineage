@@ -42,7 +42,20 @@ def _iter_lineage_edges(manifest: Dict[str, Any]) -> Iterable[Tuple[Dict[str, An
             yield upstream, downstream
 
 
-def _trace_column_exists(conn, schema: str, table: str) -> bool:
+def _trace_column_exists(conn, schema: str, table: str, adapter_type: str) -> bool:
+    if adapter_type.startswith("clickhouse"):
+        escaped_schema = schema.replace("'", "''")
+        escaped_table = table.replace("'", "''")
+        sql = (
+            "SELECT 1 FROM system.columns "
+            f"WHERE database = '{escaped_schema}' "
+            f"AND table = '{escaped_table}' "
+            f"AND name = '{TRACE_COLUMN}' "
+            "LIMIT 1"
+        )
+        result = conn.query(sql)
+        return bool(result.result_rows)
+
     with conn.cursor() as cur:
         cur.execute(
             """
@@ -57,7 +70,7 @@ def _trace_column_exists(conn, schema: str, table: str) -> bool:
         return cur.fetchone() is not None
 
 
-def _ensure_trace_column_on_seed(conn, node: Dict[str, Any]) -> None:
+def _ensure_trace_column_on_seed(conn, node: Dict[str, Any], adapter_type: str) -> None:
     """Ensure seeds have a trace column populated."""
     if node.get("resource_type") != "seed":
         return
@@ -65,24 +78,42 @@ def _ensure_trace_column_on_seed(conn, node: Dict[str, Any]) -> None:
     schema, table = _relation_from_node(node)
     
     # Check if exists
-    if _trace_column_exists(conn, schema, table):
+    if _trace_column_exists(conn, schema, table, adapter_type):
         # We might want to check if they are null? 
         # But for now assume if column exists it's fine or was populated.
         # Ideally we run an UPDATE to be sure.
         return
-        
-    # Add column
+
+    if adapter_type.startswith("clickhouse"):
+        conn.command(
+            f"ALTER TABLE {schema}.{table} ADD COLUMN IF NOT EXISTS {TRACE_COLUMN} UUID"
+        )
+        conn.command(
+            f"ALTER TABLE {schema}.{table} UPDATE {TRACE_COLUMN} = generateUUIDv4() "
+            f"WHERE {TRACE_COLUMN} IS NULL"
+        )
+        return
+
     with conn.cursor() as cur:
-        # Alter table
         cur.execute(f'ALTER TABLE "{schema}"."{table}" ADD COLUMN {TRACE_COLUMN} uuid')
-        # Update values
-        cur.execute(f'UPDATE "{schema}"."{table}" SET {TRACE_COLUMN} = md5(random()::text || clock_timestamp()::text)::uuid WHERE {TRACE_COLUMN} IS NULL')
+        cur.execute(
+            f'UPDATE "{schema}"."{table}" '
+            f"SET {TRACE_COLUMN} = md5(random()::text || clock_timestamp()::text)::uuid "
+            f"WHERE {TRACE_COLUMN} IS NULL"
+        )
     conn.commit()
 
 
-def _fetch_rows(conn, schema: str, table: str, order_by_trace: bool) -> List[Dict[str, Any]]:
+def _fetch_rows(conn, schema: str, table: str, order_by_trace: bool, adapter_type: str) -> List[Dict[str, Any]]:
     # In tokens mode, we technically don't need to order by trace if we don't zip.
     # But it's good practice.
+    if adapter_type.startswith("clickhouse"):
+        order_by = TRACE_COLUMN if order_by_trace else "1"
+        sql = f"SELECT * FROM {schema}.{table} ORDER BY {order_by}"
+        result = conn.query(sql)
+        colnames = result.column_names
+        return [dict(zip(colnames, row)) for row in result.result_rows]
+
     with conn.cursor() as cur:
         if order_by_trace:
             sql = f'SELECT * FROM "{schema}"."{table}" ORDER BY "{TRACE_COLUMN}"'
@@ -117,6 +148,7 @@ def generate_lineage_for_project(
     manifest_path: Path | None = None,
     output_dir: Path | None = None,
     vars: dict | None = None,
+    adapter_type: str = "postgres",
 ) -> List[MappingRecord]:
     """
     High–level API: given a DB connection + dbt project, compute lineage
@@ -138,7 +170,7 @@ def generate_lineage_for_project(
     nodes = manifest.get("nodes", {})
     for node in nodes.values():
         if node.get("resource_type") == "seed":
-             _ensure_trace_column_on_seed(conn, node)
+            _ensure_trace_column_on_seed(conn, node, adapter_type)
 
     writer = _get_writer(plugin, output_dir)
 
@@ -157,15 +189,27 @@ def generate_lineage_for_project(
         
         is_tokens_mode = plugin.config.lineage_mode == "tokens"
         
-        upstream_has_trace = _trace_column_exists(conn, upstream_schema, upstream_table)
-        downstream_has_trace = _trace_column_exists(conn, downstream_schema, downstream_table)
+        upstream_has_trace = _trace_column_exists(conn, upstream_schema, upstream_table, adapter_type)
+        downstream_has_trace = _trace_column_exists(conn, downstream_schema, downstream_table, adapter_type)
         
         upstream_rows = []
         if not is_tokens_mode:
-             # Fetch upstream for heuristic
-             upstream_rows = _fetch_rows(conn, upstream_schema, upstream_table, order_by_trace=upstream_has_trace)
+            # Fetch upstream for heuristic
+            upstream_rows = _fetch_rows(
+                conn,
+                upstream_schema,
+                upstream_table,
+                order_by_trace=upstream_has_trace,
+                adapter_type=adapter_type,
+            )
         
-        downstream_rows = _fetch_rows(conn, downstream_schema, downstream_table, order_by_trace=downstream_has_trace)
+        downstream_rows = _fetch_rows(
+            conn,
+            downstream_schema,
+            downstream_table,
+            order_by_trace=downstream_has_trace,
+            adapter_type=adapter_type,
+        )
 
         compiled_sql: str = downstream.get("compiled_code") or ""
 

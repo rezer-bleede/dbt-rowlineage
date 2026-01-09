@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import argparse
+import importlib
 import os
 import sys
 from pathlib import Path
@@ -127,9 +128,10 @@ def _load_profile_connection(project_root: Path) -> dict[str, Optional[str]]:
 
         host = target_cfg.get("host")
         port = target_cfg.get("port")
-        database = target_cfg.get("dbname") or target_cfg.get("database")
+        database = target_cfg.get("dbname") or target_cfg.get("database") or target_cfg.get("schema")
         user = target_cfg.get("user")
         password = target_cfg.get("password") or target_cfg.get("pass") or target_cfg.get("passphrase")
+        adapter_type = target_cfg.get("type")
 
         return {
             "host": host,
@@ -137,6 +139,7 @@ def _load_profile_connection(project_root: Path) -> dict[str, Optional[str]]:
             "database": database,
             "user": user,
             "password": password,
+            "type": adapter_type,
         }
     except Exception:
         # Swallow YAML/IO errors; CLI will fall back to env/flags and raise a
@@ -160,6 +163,7 @@ def _resolve_db_param(
 
 def _get_connection(args: argparse.Namespace, project_root: Path):
     profile_defaults = _load_profile_connection(project_root)
+    adapter_type = (profile_defaults.get("type") or os.getenv("DBT_ADAPTER") or "postgres").lower()
 
     host = _resolve_db_param(args.db_host, ["DBT_HOST", "PGHOST"], profile_defaults.get("host", "localhost"))
     port_str = _resolve_db_param(
@@ -176,12 +180,16 @@ def _get_connection(args: argparse.Namespace, project_root: Path):
     user = _resolve_db_param(args.db_user, ["DBT_USER", "PGUSER"], profile_defaults.get("user"))
     password = _resolve_db_param(args.db_password, ["DBT_PASSWORD", "PGPASSWORD"], profile_defaults.get("password"))
 
+    if adapter_type.startswith("clickhouse"):
+        database = database or "default"
+        user = user or "default"
+
     missing: list[str] = []
     if not database:
         missing.append("database (DBT_DATABASE / PGDATABASE / --db-name)")
     if not user:
         missing.append("user (DBT_USER / PGUSER / --db-user)")
-    if not password:
+    if not password and not adapter_type.startswith("clickhouse"):
         missing.append("password (DBT_PASSWORD / PGPASSWORD / --db-password)")
 
     if missing:
@@ -189,13 +197,32 @@ def _get_connection(args: argparse.Namespace, project_root: Path):
             "Missing DB connection parameters:\n- " + "\n- ".join(missing)
         )
 
+    if adapter_type.startswith("clickhouse"):
+        clickhouse_connect = importlib.import_module("clickhouse_connect")
+        try:
+            return (
+                clickhouse_connect.get_client(
+                    host=host,
+                    port=port,
+                    username=user,
+                    password=password,
+                    database=database,
+                ),
+                adapter_type,
+            )
+        except Exception as exc:
+            raise RuntimeError(f"Failed to connect to ClickHouse: {exc}") from exc
+
     try:
-        return psycopg2.connect(
-            host=host,
-            port=port,
-            dbname=database,
-            user=user,
-            password=password,
+        return (
+            psycopg2.connect(
+                host=host,
+                port=port,
+                dbname=database,
+                user=user,
+                password=password,
+            ),
+            adapter_type,
         )
     except OperationalError as exc:
         raise RuntimeError(f"Failed to connect to database: {exc}") from exc
@@ -222,7 +249,7 @@ def main(argv: Optional[list[str]] = None) -> int:
 
     try:
         project_root, manifest_path, output_dir = _resolve_paths(args)
-        conn = _get_connection(args, project_root)
+        conn, adapter_type = _get_connection(args, project_root)
     except Exception as e:
         print(f"[dbt-rowlineage] ERROR: {e}", file=sys.stderr)
         return 1
@@ -236,6 +263,7 @@ def main(argv: Optional[list[str]] = None) -> int:
             manifest_path=manifest_path,
             output_dir=output_dir,
             vars=vars_overrides if vars_overrides else None,
+            adapter_type=adapter_type,
         )
         print(f"[dbt-rowlineage] Generated {len(mappings)} lineage mappings.")
         return 0

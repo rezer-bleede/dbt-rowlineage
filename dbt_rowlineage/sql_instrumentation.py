@@ -5,12 +5,8 @@ from __future__ import annotations
 import logging
 from typing import List
 
-try:
-    import sqlglot
-    from sqlglot import exp
-except ImportError:
-    sqlglot = None
-    exp = None
+import sqlglot
+from sqlglot import exp
 
 from .utils.sql import PARENT_TRACE_COLUMN, TRACE_COLUMN, TRACE_EXPRESSION
 
@@ -19,10 +15,6 @@ logger = logging.getLogger(__name__)
 
 def instrument_sql(compiled_sql: str, dialect: str = "postgres") -> str:
     """Parse SQL and inject lineage columns into SELECT statements."""
-    if sqlglot is None:
-        logger.warning("sqlglot not installed, skipping instrumentation")
-        return compiled_sql
-
     try:
         # Parse using specified dialect
         expressions = sqlglot.parse(compiled_sql, read=dialect)
@@ -41,9 +33,6 @@ def instrument_sql(compiled_sql: str, dialect: str = "postgres") -> str:
 
 
 def _inject_lineage(expression: "exp.Expression") -> "exp.Expression":
-    if not exp:
-         return expression
-
     select_nodes = list(expression.find_all(exp.Select))
     
     for select_node in select_nodes:
@@ -112,7 +101,7 @@ def _build_tokens_expression(node: exp.Select) -> exp.Expression:
         bool(node.args.get("distinct"))
     )
 
-    from_item = node.args.get("from")
+    from_item = node.args.get("from") or node.args.get("from_")
     joins = node.args.get("joins") or []
     
     sources = []
@@ -185,41 +174,13 @@ def _build_tokens_expression(node: exp.Select) -> exp.Expression:
     # But sqlglot transpiles them often (e.g. to UNNEST/DISTINCT/ARRAY_AGG).
     
     if not is_aggregated:
-         # Row preserving: just dedup the current array
-         return exp.ArrayUnique(this=merged_array)
-    else:
-         # Row reducing: aggregate across rows + dedup
-         # ARRAY_UNIQUE_AGG compiles to e.g. ARRAY_AGG(DISTINCT val) usually (if flattening is implied?)
-         # Wait, ArrayUniqueAgg usually takes an array, flattens it, and distincts it?
-         # Or takes a scalar?
-         # Most DBs: ARRAY_AGG(DISTINCT x) takes scalar x.
-         # But our input 'merged_array' is an ARRAY for the current row.
-         # So we need to: Flatten -> Distinct -> Agg.
-         
-         # exp.ArrayUniqueAgg might assume scalar input in some dialects?
-         # Let's try to be explicit:
-         # standard SQL: ARRAY_AGG(...)
-         # But we have input arrays.
-         # "rowlineage.tokens_union_agg" was our PG custom agg that took arrays.
-         
-         # Generic approach:
-         # If dialect supports array_union_agg (Snowflake), use it.
-         # Otherwise, we rely on sqlglot to unnest if possible?
-         # Or we can just emit `ARRAY_UNIQUE(ARRAY_AGG(merged_array))` ?? 
-         # No, ARRAY_AGG(array) -> array of arrays.
-         
-         # If we are effectively "summing" arrays.
-         # Snowflake: ARRAY_UNION_AGG(col)
-         # BigQuery: ARRAY_CONCAT_AGG(col)
-         # Postgres: Custom UDF (removed).
-         
-         # Let's rely on exp.ArrayUniqueAgg(this=merged_array) and hope sqlglot handles it 
-         # or we define a transformation.
-         # Actually, simpler: 
-         # If we can assume modern Warehouse (Snowflake/BQ), they have functions.
-         # If standard SQL, it's hard. 
-         # But user said "Oracle, MySQL, Snowflake...".
-         # MySQL doesn't have arrays really (JSON).
-         # We'll assume the target supports Arrays if they are using this plugin mode.
-         
-         return exp.ArrayUniqueAgg(this=merged_array)
+        return _array_unique_expression(merged_array)
+
+    return exp.Anonymous(this="ARRAY_UNIQUE_AGG", expressions=[merged_array])
+
+
+def _array_unique_expression(value: exp.Expression) -> exp.Expression:
+    array_unique = getattr(exp, "ArrayUnique", None)
+    if array_unique is not None:
+        return array_unique(this=value)
+    return exp.Anonymous(this="ARRAY_UNIQUE", expressions=[value])
