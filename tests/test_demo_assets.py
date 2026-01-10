@@ -85,4 +85,10 @@ def test_demo_uses_nondefault_postgres_port():
 def test_demo_includes_aggregation_model():
     mart_model = Path("demo/models/marts/region_rollup.sql").read_text()
     assert "group by region" in mart_model.lower()
-    assert "array_agg" in mart_model.lower()
+    assert "ordered_array_agg" in mart_model.lower()
+
+
+def test_demo_array_agg_macro_supports_clickhouse():
+    macro = Path("demo/macros/ordered_array_agg.sql").read_text()
+    assert "array_agg" in macro
+    assert "groupArray" in macro
