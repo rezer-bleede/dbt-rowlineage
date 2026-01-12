@@ -7,5 +7,5 @@
 {% endmacro %}
 
 {% macro clickhouse__ordered_array_agg(value, order_by) %}
-  groupArray({{ value }} order by {{ order_by }})
+  arrayMap(x -> x.2, arraySort(x -> x.1, groupArray(({{ order_by }}, {{ value }}))))
 {% endmacro %}
