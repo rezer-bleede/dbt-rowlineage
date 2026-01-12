@@ -89,6 +89,59 @@ def _write_lineage(tmp_path: Path, seed_trace: str) -> Path:
     return lineage_path
 
 
+def _write_manifest_with_region_rollup(tmp_path: Path) -> Path:
+    manifest = {
+        "nodes": {
+            "seed.rowlineage_demo.example_source": {
+                "resource_type": "seed",
+                "schema": "staging",
+                "name": "example_source",
+            },
+            "model.rowlineage_demo.staging_model": {
+                "resource_type": "model",
+                "schema": "staging",
+                "name": "staging_model",
+                "compiled_code": "select * from example_source",
+                "depends_on": {"nodes": ["seed.rowlineage_demo.example_source"]},
+            },
+            "model.rowlineage_demo.region_rollup": {
+                "resource_type": "model",
+                "schema": "marts",
+                "name": "region_rollup",
+                "compiled_code": "select region, count(*) from staging_model",
+                "depends_on": {"nodes": ["model.rowlineage_demo.staging_model"]},
+            },
+        }
+    }
+    manifest_path = tmp_path / "manifest.json"
+    manifest_path.write_text(json.dumps(manifest))
+    return manifest_path
+
+
+def _write_lineage_for_region_rollup(tmp_path: Path, seed_trace: str) -> Path:
+    lineage_path = tmp_path / "lineage.jsonl"
+    records = [
+        {
+            "source_model": "example_source",
+            "target_model": "staging_model",
+            "source_trace_id": seed_trace,
+            "target_trace_id": "stg-1",
+            "compiled_sql": "select * from example_source",
+            "executed_at": "2024-01-01T00:00:00Z",
+        },
+        {
+            "source_model": "staging_model",
+            "target_model": "region_rollup",
+            "source_trace_id": "stg-1",
+            "target_trace_id": "region-1",
+            "compiled_sql": "select region, count(*) from staging_model",
+            "executed_at": "2024-01-01T00:00:00Z",
+        },
+    ]
+    lineage_path.write_text("\n".join(json.dumps(record) for record in records))
+    return lineage_path
+
+
 def test_ui_integration_with_manifest_and_lineage(tmp_path: Path):
     seed_row = {"id": 1, "customer_name": "Alice", "region": "west"}
     seed_trace = new_trace_id(seed_row)
@@ -136,3 +189,42 @@ def test_ui_serves_static_index():
 
     assert response.status_code == 200
     assert "Row Level Lineage Explorer" in response.text
+
+
+def test_ui_integration_with_region_rollup(tmp_path: Path):
+    seed_row = {"id": 1, "customer_name": "Alice", "region": "west"}
+    seed_trace = new_trace_id(seed_row)
+    manifest_path = _write_manifest_with_region_rollup(tmp_path)
+    lineage_path = _write_lineage_for_region_rollup(tmp_path, seed_trace)
+
+    tables = {
+        "staging.example_source": [seed_row],
+        "staging.staging_model": [
+            {"id": 1, "customer_name_upper": "ALICE", "region": "west", TRACE_COLUMN: "stg-1"}
+        ],
+        "marts.region_rollup": [
+            {
+                "region": "west",
+                "customer_count": 1,
+                "customers": ["ALICE"],
+                TRACE_COLUMN: "region-1",
+            }
+        ],
+    }
+    db_client = FakeDatabaseClient(
+        tables=tables,
+        traced_tables={"staging.staging_model", "marts.region_rollup"},
+    )
+    repository = LineageRepository(
+        lineage_path=lineage_path,
+        manifest_path=manifest_path,
+        db_client=db_client,
+    )
+
+    app = create_app(repository_provider=lambda: repository)
+    client = TestClient(app)
+
+    mart_response = client.get("/api/mart_rows")
+    assert mart_response.status_code == 200
+    models = mart_response.json()["models"]
+    assert models[0]["name"] == "region_rollup"
