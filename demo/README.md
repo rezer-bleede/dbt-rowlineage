@@ -33,7 +33,7 @@ Override the output format or path by passing flags such as `--export-format par
 
 ### Tracing aggregated marts
 
-The `region_rollup` model groups staging rows by region while preserving row lineage. It uses the `ordered_array_agg` macro so Postgres keeps `array_agg(... order by ...)` semantics and ClickHouse uses `groupArray(value order by ...)` while keeping customer ordering deterministic. The lineage UI reads dbt's `manifest.json` to discover marts dynamically, so additional models appear automatically without code changes. Click any aggregated row in the UI to see every upstream staging and seed record that contributed to the grouped result.
+The `region_rollup` model groups staging rows by region while preserving row lineage. It uses the `ordered_array_agg` macro so Postgres keeps `array_agg(... order by ...)` semantics and ClickHouse sorts tuple-based `groupArray` output via `arraySort` to keep customer ordering deterministic. The lineage UI reads dbt's `manifest.json` to discover marts dynamically, so additional models appear automatically without code changes. Click any aggregated row in the UI to see every upstream staging and seed record that contributed to the grouped result.
 
 Example JSONL line:
 

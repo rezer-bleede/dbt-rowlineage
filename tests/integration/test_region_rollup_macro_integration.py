@@ -9,4 +9,4 @@ def test_region_rollup_uses_ordered_array_agg():
 def test_clickhouse_macro_keeps_ordered_array_agg():
     macro = Path("demo/macros/ordered_array_agg.sql").read_text()
     assert "groupArray" in macro
-    assert "order by" in macro.lower()
+    assert "arraySort" in macro
